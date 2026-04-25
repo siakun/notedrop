@@ -238,3 +238,85 @@ describe('ContentTransformer.transform() - HIDE policy', () => {
     expect(r.markdown).not.toContain('---')
   })
 })
+
+describe('ContentTransformer.transform() - wikilink safety', () => {
+  it('published wikilink becomes markdown link to /notedrop/<slug>', async () => {
+    const { transformer } = await setup({
+      '/a.md': { body: 'see [[Other]] here', fm: { 'notedrop-publish': true } },
+      '/Other.md': {
+        body: 'x',
+        fm: { 'notedrop-publish': true, 'notedrop-slug': 'other-slug' }
+      }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).toContain('[Other](/notedrop/other-slug)')
+    expect(r.markdown).not.toContain('[[Other]]')
+  })
+
+  it('published wikilink with no slug uses hash', async () => {
+    const { transformer, index } = await setup({
+      '/a.md': { body: '[[Other]]', fm: { 'notedrop-publish': true } },
+      '/Other.md': { body: 'x', fm: { 'notedrop-publish': true } }
+    })
+    const otherHash = index.getByPath('/Other.md')!.hash
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).toContain(`[Other](/notedrop/${otherHash})`)
+  })
+
+  it('published wikilink with alias renders alias as link text', async () => {
+    const { transformer } = await setup({
+      '/a.md': { body: '[[Other|see this]]', fm: { 'notedrop-publish': true } },
+      '/Other.md': {
+        body: 'x',
+        fm: { 'notedrop-publish': true, 'notedrop-slug': 'o' }
+      }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).toContain('[see this](/notedrop/o)')
+  })
+
+  it('unpublished wikilink without alias becomes dead link with note name', async () => {
+    const { transformer } = await setup({
+      '/a.md': { body: '[[Private]]', fm: { 'notedrop-publish': true } }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).toContain(
+      '<span class="notedrop-deadlink">Private(접근 권한이 없습니다)</span>'
+    )
+    expect(r.markdown).not.toContain('[[Private]]')
+  })
+
+  it('unpublished wikilink WITH alias renders alias only (no note name leak)', async () => {
+    const { transformer } = await setup({
+      '/a.md': { body: '[[SecretNote|관련 메모]]', fm: { 'notedrop-publish': true } }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).toContain('<span class="notedrop-deadlink">관련 메모</span>')
+    expect(r.markdown).not.toContain('SecretNote')
+  })
+
+  it('multiple identical [[Note]] occurrences all get replaced', async () => {
+    const { transformer } = await setup({
+      '/a.md': {
+        body: '[[Other]] and [[Other]] again',
+        fm: { 'notedrop-publish': true }
+      },
+      '/Other.md': {
+        body: 'x',
+        fm: { 'notedrop-publish': true, 'notedrop-slug': 'o' }
+      }
+    })
+    const r = await transformer.transform('/a.md')
+    const occurrences = r.markdown.split('[Other](/notedrop/o)').length - 1
+    expect(occurrences).toBe(2)
+  })
+
+  it('alias-only safety net is exercised even on slug-less unpublished note', async () => {
+    const { transformer } = await setup({
+      '/a.md': { body: '[[VerySecret|see ref]]', fm: { 'notedrop-publish': true } }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).not.toContain('VerySecret')
+    expect(r.markdown).toContain('see ref')
+  })
+})
