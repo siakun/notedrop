@@ -17,23 +17,74 @@ export class ContentTransformer {
 
     const resolved = await this.resolver.resolve(filePath)
     const warnings: string[] = []
+    const assetRefs: import('./types.js').AssetRef[] = []
 
     let body = stripFrontmatter(resolved.rawMarkdown)
     body = applyHide(body)
-    body = this.transformWikilinks(body, resolved.refs)
+    body = await this.transformBody(body, resolved.refs, item.hash, 1, warnings, assetRefs)
 
     return {
       outputFrontmatter: this.buildFrontmatter(item),
       markdown: body,
-      assetRefs: [],
+      assetRefs,
       warnings
     }
   }
 
-  private transformWikilinks(body: string, refs: import('./types.js').Reference[]): string {
+  private async transformBody(
+    body: string,
+    refs: import('./types.js').Reference[],
+    ownerHash: string,
+    depthLeft: number,
+    warnings: string[],
+    assetRefs: import('./types.js').AssetRef[]
+  ): Promise<string> {
     for (const ref of refs) {
-      if (ref.type !== 'wikilink') continue
-      body = replaceAll(body, ref.rawText, renderWikilink(ref))
+      if (ref.type === 'wikilink') {
+        body = replaceAll(body, ref.rawText, renderWikilink(ref))
+        continue
+      }
+      if (ref.type === 'embed') {
+        body = await this.processEmbed(body, ref, ownerHash, depthLeft, warnings, assetRefs)
+        continue
+      }
+      if (ref.type === 'image') {
+        // Filled in by Task 17.
+        continue
+      }
+    }
+    return body
+  }
+
+  private async processEmbed(
+    body: string,
+    ref: import('./types.js').Reference,
+    ownerHash: string,
+    depthLeft: number,
+    warnings: string[],
+    assetRefs: import('./types.js').AssetRef[]
+  ): Promise<string> {
+    if (depthLeft <= 0) {
+      return replaceAll(body, ref.rawText, EMBED_OVERFLOW_HTML)
+    }
+    const res = ref.resolution
+    if (res.kind === 'unpublished-note') {
+      return replaceAll(body, ref.rawText, embedUnpublishedPlaceholder(res.noteName))
+    }
+    if (res.kind === 'broken') {
+      warnings.push(`broken embed: ${ref.target}`)
+      return replaceAll(body, ref.rawText, embedUnpublishedPlaceholder(ref.target))
+    }
+    if (res.kind === 'published-note') {
+      const target = this.index.get(res.hash)
+      if (!target) return replaceAll(body, ref.rawText, embedUnpublishedPlaceholder(ref.target))
+      const targetResolved = await this.resolver.resolve(target.filePath)
+      let inner = stripFrontmatter(targetResolved.rawMarkdown)
+      inner = applyHide(inner)
+      inner = await this.transformBody(
+        inner, targetResolved.refs, ownerHash, depthLeft - 1, warnings, assetRefs
+      )
+      return replaceAll(body, ref.rawText, inner)
     }
     return body
   }
@@ -87,4 +138,10 @@ function renderWikilink(ref: import('./types.js').Reference): string {
 
 function replaceAll(body: string, needle: string, replacement: string): string {
   return body.split(needle).join(replacement)
+}
+
+const EMBED_OVERFLOW_HTML = '<div class="notedrop-embed-overflow">(임베드 깊이 초과)</div>'
+
+function embedUnpublishedPlaceholder(name: string): string {
+  return `<div class="notedrop-embed-placeholder">접근할 수 없는 문서: ${name}</div>`
 }
