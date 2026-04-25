@@ -32,9 +32,17 @@ jobs:
             exit 1
           fi
 
-      - name: Install dependencies
+      - name: Install plugin dependencies
         working-directory: plugin
         run: npm ci
+
+      - name: Install viewer dependencies
+        working-directory: viewer
+        run: npm ci
+
+      - name: Build viewer (embedded into plugin)
+        working-directory: viewer
+        run: npm run build
 
       - name: Typecheck
         working-directory: plugin
@@ -44,7 +52,7 @@ jobs:
         working-directory: plugin
         run: npm test
 
-      - name: Build
+      - name: Build plugin
         working-directory: plugin
         run: npm run build
         env:
