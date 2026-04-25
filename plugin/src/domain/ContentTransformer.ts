@@ -16,16 +16,26 @@ export class ContentTransformer {
     if (!item) throw new Error(`ContentTransformer: ${filePath} not in index`)
 
     const resolved = await this.resolver.resolve(filePath)
-    const stripped = stripFrontmatter(resolved.rawMarkdown)
-    const hidden = applyHide(stripped)
     const warnings: string[] = []
+
+    let body = stripFrontmatter(resolved.rawMarkdown)
+    body = applyHide(body)
+    body = this.transformWikilinks(body, resolved.refs)
 
     return {
       outputFrontmatter: this.buildFrontmatter(item),
-      markdown: hidden,
+      markdown: body,
       assetRefs: [],
       warnings
     }
+  }
+
+  private transformWikilinks(body: string, refs: import('./types.js').Reference[]): string {
+    for (const ref of refs) {
+      if (ref.type !== 'wikilink') continue
+      body = replaceAll(body, ref.rawText, renderWikilink(ref))
+    }
+    return body
   }
 
   private buildFrontmatter(item: PublishedItem): PageFrontmatter {
@@ -57,4 +67,24 @@ const COMMENT_RE = /%%[\s\S]*?%%/g
 
 function applyHide(body: string): string {
   return body.replace(WAYPOINT_RE, '').replace(COMMENT_RE, '')
+}
+
+function renderWikilink(ref: import('./types.js').Reference): string {
+  const res = ref.resolution
+  if (res.kind === 'published-note') {
+    const slugOrHash = res.slug ?? res.hash
+    const text = ref.alias ?? ref.target
+    return `[${text}](/notedrop/${slugOrHash})`
+  }
+  if (res.kind === 'unpublished-note') {
+    if (ref.alias !== undefined) {
+      return `<span class="notedrop-deadlink">${ref.alias}</span>`
+    }
+    return `<span class="notedrop-deadlink">${res.noteName}(접근 권한이 없습니다)</span>`
+  }
+  return `<span class="notedrop-deadlink">${ref.target}(접근 권한이 없습니다)</span>`
+}
+
+function replaceAll(body: string, needle: string, replacement: string): string {
+  return body.split(needle).join(replacement)
 }
