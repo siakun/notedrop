@@ -11,6 +11,7 @@ export type PublishOutcome = {
   commitSha: string
   changedFiles: number
   url: string
+  initialized: boolean
 }
 
 type Headers = Record<string, string>
@@ -53,15 +54,26 @@ export class GitHubPublisher {
     }
     const branch = this.config.branch
 
-    const ref = await this.api<{ object: { sha: string } }>(
-      `/repos/${this.owner}/${this.repo}/git/refs/heads/${branch}`
-    )
-    const parentCommitSha = ref.object.sha
+    let parentCommitSha: string | null = null
+    let parentTreeSha: string | null = null
+    let isEmpty = false
 
-    const parentCommit = await this.api<{ tree: { sha: string } }>(
-      `/repos/${this.owner}/${this.repo}/git/commits/${parentCommitSha}`
-    )
-    const parentTreeSha = parentCommit.tree.sha
+    try {
+      const ref = await this.api<{ object: { sha: string } }>(
+        `/repos/${this.owner}/${this.repo}/git/refs/heads/${branch}`
+      )
+      parentCommitSha = ref.object.sha
+      const parentCommit = await this.api<{ tree: { sha: string } }>(
+        `/repos/${this.owner}/${this.repo}/git/commits/${parentCommitSha}`
+      )
+      parentTreeSha = parentCommit.tree.sha
+    } catch (err) {
+      if (err instanceof GitHubApiError && (err.status === 404 || err.status === 409)) {
+        isEmpty = true
+      } else {
+        throw err
+      }
+    }
 
     const treeEntries = []
     for (const file of plan.files) {
@@ -74,28 +86,46 @@ export class GitHubPublisher {
       })
     }
 
+    const treeBody: Record<string, unknown> = { tree: treeEntries }
+    if (parentTreeSha) treeBody.base_tree = parentTreeSha
+
     const tree = await this.api<{ sha: string }>(
       `/repos/${this.owner}/${this.repo}/git/trees`,
       'POST',
-      { base_tree: parentTreeSha, tree: treeEntries }
+      treeBody
     )
+
+    const commitBody: Record<string, unknown> = {
+      message,
+      tree: tree.sha
+    }
+    if (parentCommitSha) commitBody.parents = [parentCommitSha]
 
     const commit = await this.api<{ sha: string }>(
       `/repos/${this.owner}/${this.repo}/git/commits`,
       'POST',
-      { message, tree: tree.sha, parents: [parentCommitSha] }
+      commitBody
     )
 
-    await this.api(
-      `/repos/${this.owner}/${this.repo}/git/refs/heads/${branch}`,
-      'PATCH',
-      { sha: commit.sha, force: false }
-    )
+    if (isEmpty) {
+      await this.api(
+        `/repos/${this.owner}/${this.repo}/git/refs`,
+        'POST',
+        { ref: `refs/heads/${branch}`, sha: commit.sha }
+      )
+    } else {
+      await this.api(
+        `/repos/${this.owner}/${this.repo}/git/refs/heads/${branch}`,
+        'PATCH',
+        { sha: commit.sha, force: false }
+      )
+    }
 
     return {
       commitSha: commit.sha,
       changedFiles: plan.files.length,
-      url: `https://github.com/${this.owner}/${this.repo}/commit/${commit.sha}`
+      url: `https://github.com/${this.owner}/${this.repo}/commit/${commit.sha}`,
+      initialized: isEmpty
     }
   }
 

@@ -3,6 +3,7 @@ export type PluginSettings = {
   targetRepo: string
   targetBranch: string
   publicRoot: string
+  publishViewerAssets: boolean
   previewPort: number
   autoStartPreview: boolean
   autoUnpublish: boolean
@@ -13,7 +14,8 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   githubPat: '',
   targetRepo: '',
   targetBranch: 'main',
-  publicRoot: 'viewer/public',
+  publicRoot: '',
+  publishViewerAssets: true,
   previewPort: 4321,
   autoStartPreview: false,
   autoUnpublish: false,

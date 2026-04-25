@@ -76,6 +76,7 @@ describe('GitHubPublisher', () => {
     const outcome = await publisher.publish(samplePlan, 'test commit')
     expect(outcome.commitSha).toBe('new-commit')
     expect(outcome.changedFiles).toBe(2)
+    expect(outcome.initialized).toBe(false)
     expect(outcome.url).toContain('siakun/notedrop')
     expect(calls.find((c) => c.url.endsWith('/trees'))?.body).toMatchObject({
       base_tree: 'parent-tree',
@@ -131,6 +132,53 @@ describe('GitHubPublisher', () => {
       })
     }) as never
     await expect(publisher.publish(samplePlan)).rejects.toBeInstanceOf(GitHubApiError)
+  })
+
+  it('빈 repo (404 refs) → POST refs 로 초기 commit 생성', async () => {
+    const calls: { url: string; method: string; body?: unknown }[] = []
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      const u = String(url)
+      const method = init?.method ?? 'GET'
+      calls.push({
+        url: u,
+        method,
+        body: init?.body ? JSON.parse(init.body as string) : undefined
+      })
+      if (u.endsWith('/refs/heads/main') && method === 'GET') {
+        return new Response(JSON.stringify({ message: 'Not Found' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
+      if (u.endsWith('/blobs') && method === 'POST') {
+        return jsonResponse({ sha: 'b' + calls.length })
+      }
+      if (u.endsWith('/trees') && method === 'POST') {
+        return jsonResponse({ sha: 'new-tree' })
+      }
+      if (u.endsWith('/commits') && method === 'POST') {
+        return jsonResponse({ sha: 'init-commit' })
+      }
+      if (u.endsWith('/git/refs') && method === 'POST') {
+        return jsonResponse({ ref: 'refs/heads/main' })
+      }
+      throw new Error(`unexpected: ${method} ${u}`)
+    })
+    globalThis.fetch = fetchMock as never
+
+    const outcome = await publisher.publish(samplePlan, 'init commit')
+    expect(outcome.initialized).toBe(true)
+    expect(outcome.commitSha).toBe('init-commit')
+
+    const treeCall = calls.find((c) => c.url.endsWith('/trees'))
+    expect(treeCall?.body).not.toHaveProperty('base_tree')
+    const commitCall = calls.find((c) => c.url.endsWith('/commits') && c.method === 'POST')
+    expect(commitCall?.body).not.toHaveProperty('parents')
+    const refCall = calls.find((c) => c.url.endsWith('/git/refs') && c.method === 'POST')
+    expect(refCall?.body).toMatchObject({
+      ref: 'refs/heads/main',
+      sha: 'init-commit'
+    })
   })
 
   it('빈 plan → throw', async () => {
