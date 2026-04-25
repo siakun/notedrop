@@ -23,8 +23,11 @@ export class ContentTransformer {
     body = applyHide(body)
     body = await this.transformBody(body, resolved.refs, item.hash, 1, warnings, assetRefs)
 
+    const cover = await this.resolveCover(item, warnings, assetRefs)
+    const customCss = await this.buildCustomCss(item, warnings)
+
     return {
-      outputFrontmatter: this.buildFrontmatter(item),
+      outputFrontmatter: { ...this.buildFrontmatter(item), cover, customCss },
       markdown: body,
       assetRefs,
       warnings
@@ -49,11 +52,91 @@ export class ContentTransformer {
         continue
       }
       if (ref.type === 'image') {
-        // Filled in by Task 17.
+        body = await this.processImage(body, ref, ownerHash, warnings, assetRefs)
         continue
       }
     }
     return body
+  }
+
+  private async processImage(
+    body: string,
+    ref: import('./types.js').Reference,
+    ownerHash: string,
+    warnings: string[],
+    assetRefs: import('./types.js').AssetRef[]
+  ): Promise<string> {
+    const res = ref.resolution
+    if (res.kind !== 'image') {
+      warnings.push(`broken image: ${ref.target}`)
+      return replaceAll(body, ref.rawText, `[이미지 누락: ${ref.target}]`)
+    }
+    const basename = res.vaultPath.split('/').pop()!
+    const outputPath = `/content/${ownerHash}/_assets/${basename}`
+    const bytes = await this.vault.readBinary(res.vaultPath)
+    if (!assetRefs.some((a) => a.outputPath === outputPath)) {
+      assetRefs.push({
+        vaultPath: res.vaultPath,
+        outputPath,
+        size: bytes.byteLength,
+        mime: res.mime
+      })
+    }
+    const attrs = [`src="${outputPath}"`, 'alt=""']
+    if (ref.size?.width !== undefined) attrs.push(`width="${ref.size.width}"`)
+    if (ref.size?.height !== undefined) attrs.push(`height="${ref.size.height}"`)
+    return replaceAll(body, ref.rawText, `<img ${attrs.join(' ')}>`)
+  }
+
+  private async resolveCover(
+    item: PublishedItem,
+    warnings: string[],
+    assetRefs: import('./types.js').AssetRef[]
+  ): Promise<string | null> {
+    if (!item.cover) return null
+    const basename = item.cover.split('/').pop()!
+    const matches = await this.vault.searchByName(basename)
+    if (matches.length === 0) {
+      warnings.push(`cover not found: ${item.cover}`)
+      return null
+    }
+    const vaultPath = matches[0]!
+    const bytes = await this.vault.readBinary(vaultPath)
+    const outputPath = `/content/${item.hash}/_assets/${basename}`
+    if (!assetRefs.some((a) => a.outputPath === outputPath)) {
+      assetRefs.push({
+        vaultPath,
+        outputPath,
+        size: bytes.byteLength,
+        mime: mimeFor(basename)
+      })
+    }
+    return outputPath
+  }
+
+  private async buildCustomCss(
+    item: PublishedItem,
+    warnings: string[]
+  ): Promise<string | null> {
+    const parts: string[] = []
+    if (item.customCssRaw.inline) parts.push(item.customCssRaw.inline)
+    if (item.customCssRaw.file) {
+      const filePath = await this.resolveVaultPath(item.customCssRaw.file)
+      if (filePath) {
+        parts.push(await this.vault.readFile(filePath))
+      } else {
+        warnings.push(`customCss file not found: ${item.customCssRaw.file}`)
+      }
+    }
+    if (parts.length === 0) return null
+    return sanitizeCss(parts.join('\n'))
+  }
+
+  private async resolveVaultPath(pathOrBasename: string): Promise<string | null> {
+    if (await this.vault.fileExists(pathOrBasename)) return pathOrBasename
+    const basename = pathOrBasename.split('/').pop()!
+    const matches = await this.vault.searchByName(basename)
+    return matches[0] ?? null
   }
 
   private async processEmbed(
@@ -144,4 +227,27 @@ const EMBED_OVERFLOW_HTML = '<div class="notedrop-embed-overflow">(임베드 깊
 
 function embedUnpublishedPlaceholder(name: string): string {
   return `<div class="notedrop-embed-placeholder">접근할 수 없는 문서: ${name}</div>`
+}
+
+const MIME_BY_EXT: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  svg: 'image/svg+xml',
+  webp: 'image/webp',
+  gif: 'image/gif'
+}
+
+function mimeFor(filename: string): string {
+  const ext = filename.toLowerCase().split('.').pop() ?? ''
+  return MIME_BY_EXT[ext] ?? 'application/octet-stream'
+}
+
+function sanitizeCss(css: string): string {
+  return css
+    .split(/\r?\n/)
+    .filter((line) => !/@import\b/i.test(line))
+    .join('\n')
+    .replace(/url\(\s*['"]?https?:[^)]*\)/gi, 'url()')
+    .replace(/\bexpression\s*\([^)]*\)/gi, '')
 }
