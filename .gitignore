@@ -9,6 +9,9 @@ main.js.map
 node_modules/
 plugin/coverage/
 
+# viewer build output
+viewer/dist/
+
 # editor
 .DS_Store
 Thumbs.db

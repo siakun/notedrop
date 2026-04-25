@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "generatedAt": "2026-04-26T00:00:00.000Z",
+  "generatedBy": "notedrop-bootstrap",
+  "items": [
+    {
+      "hash": "welcome",
+      "slug": "welcome",
+      "title": "notedrop 에 오신 것을 환영합니다",
+      "cover": null,
+      "render": "doc",
+      "type": "entry",
+      "parent": null,
+      "order": null,
+      "chapters": null,
+      "updatedAt": "2026-04-26T00:00:00.000Z"
+    }
+  ]
+}
