@@ -1,0 +1,10 @@
+{
+  "id": "notedrop",
+  "name": "Notedrop",
+  "version": "0.0.1",
+  "minAppVersion": "1.4.0",
+  "description": "Publish selected notes from your Obsidian vault to a static viewer hosted on GitHub Pages.",
+  "author": "Sia819",
+  "authorUrl": "https://github.com/siakun",
+  "isDesktopOnly": true
+}
