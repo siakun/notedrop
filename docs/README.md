@@ -7,7 +7,7 @@ tags:
   - notedrop
   - spec
   - readme
-summary: notedrop 프로젝트 spec 디렉터리 인덱스. arc42 13개 + ADR 24개. 별도 개발 디렉터리로 이전 시 참고 노트 포함
+summary: notedrop 프로젝트 spec 디렉터리 인덱스. arc42 13개 + ADR 25개. 별도 개발 디렉터리로 이전 시 참고 노트 포함
 ---
 # notedrop spec
 
@@ -76,6 +76,7 @@ summary: notedrop 프로젝트 spec 디렉터리 인덱스. arc42 13개 + ADR 24
 | 0022 | [플러그인명-notedrop](decisions/0022-플러그인명-notedrop.md) | notedrop, 기본 레포명 동일 |
 | 0023 | [피드백-검색-defer](decisions/0023-피드백-검색-defer.md) | MVP 미장착, v2 |
 | 0024 | [arc42-adr-문서-패턴-채택](decisions/0024-arc42-adr-문서-패턴-채택.md) | 이 디렉터리 자체의 문서 패턴 결정 |
+| 0025 | [manifest-위치-repo-root](decisions/0025-manifest-위치-repo-root.md) | BRAT 호환 위해 manifest/main.js/styles.css 를 repo root 에 |
 
 ## 다음 단계
 
