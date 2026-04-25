@@ -406,3 +406,262 @@ describe('ContentTransformer.transform() - embed safety', () => {
     expect(r.markdown).toContain(' two')
   })
 })
+
+describe('ContentTransformer.transform() - images', () => {
+  it('image embed becomes absolute <img> with owner hash', async () => {
+    const vault = new InMemoryVaultFs({
+      '/a.md': '---\nnotedrop-publish: true\n---\n![[cover.png]]',
+      '/img/cover.png': 'PNGBYTES'
+    })
+    const meta = new FakeMetaCache({
+      '/a.md': { frontmatter: { 'notedrop-publish': true } }
+    })
+    const index = new PublishIndex(vault, meta)
+    await index.build()
+    const item = index.getByPath('/a.md')!
+    const transformer = new ContentTransformer(new ContentResolver(vault, meta, index), index, vault)
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).toContain(
+      `<img src="/content/${item.hash}/_assets/cover.png" alt="">`
+    )
+  })
+
+  it('image with width pipe gets width attribute', async () => {
+    const vault = new InMemoryVaultFs({
+      '/a.md': '---\nnotedrop-publish: true\n---\n![[c.png|400]]',
+      '/c.png': 'X'
+    })
+    const meta = new FakeMetaCache({
+      '/a.md': { frontmatter: { 'notedrop-publish': true } }
+    })
+    const index = new PublishIndex(vault, meta)
+    await index.build()
+    const item = index.getByPath('/a.md')!
+    const transformer = new ContentTransformer(new ContentResolver(vault, meta, index), index, vault)
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).toContain(
+      `<img src="/content/${item.hash}/_assets/c.png" alt="" width="400">`
+    )
+  })
+
+  it('image with widthxheight gets both attributes', async () => {
+    const vault = new InMemoryVaultFs({
+      '/a.md': '---\nnotedrop-publish: true\n---\n![[c.png|400x300]]',
+      '/c.png': 'X'
+    })
+    const meta = new FakeMetaCache({
+      '/a.md': { frontmatter: { 'notedrop-publish': true } }
+    })
+    const index = new PublishIndex(vault, meta)
+    await index.build()
+    const transformer = new ContentTransformer(new ContentResolver(vault, meta, index), index, vault)
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).toContain(`width="400"`)
+    expect(r.markdown).toContain(`height="300"`)
+  })
+
+  it('image push assetRef with vaultPath, outputPath, mime, size', async () => {
+    const vault = new InMemoryVaultFs({
+      '/a.md': '---\nnotedrop-publish: true\n---\n![[c.png]]',
+      '/c.png': 'PNGBYTES'
+    })
+    const meta = new FakeMetaCache({
+      '/a.md': { frontmatter: { 'notedrop-publish': true } }
+    })
+    const index = new PublishIndex(vault, meta)
+    await index.build()
+    const item = index.getByPath('/a.md')!
+    const transformer = new ContentTransformer(new ContentResolver(vault, meta, index), index, vault)
+    const r = await transformer.transform('/a.md')
+    expect(r.assetRefs).toHaveLength(1)
+    expect(r.assetRefs[0]).toEqual({
+      vaultPath: '/c.png',
+      outputPath: `/content/${item.hash}/_assets/c.png`,
+      size: 'PNGBYTES'.length,
+      mime: 'image/png'
+    })
+  })
+
+  it('broken image becomes placeholder + warning', async () => {
+    const { transformer } = await setup({
+      '/a.md': { body: '![[missing.png]]', fm: { 'notedrop-publish': true } }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).toContain('[이미지 누락: missing.png]')
+    expect(r.markdown).not.toContain('![[missing.png]]')
+    expect(r.warnings.some((w) => w.includes('missing.png'))).toBe(true)
+    expect(r.assetRefs).toEqual([])
+  })
+
+  it('multiple images all absolutized and tracked', async () => {
+    const vault = new InMemoryVaultFs({
+      '/a.md': '---\nnotedrop-publish: true\n---\n![[x.png]] ![[y.jpg]]',
+      '/x.png': 'X',
+      '/y.jpg': 'Y'
+    })
+    const meta = new FakeMetaCache({
+      '/a.md': { frontmatter: { 'notedrop-publish': true } }
+    })
+    const index = new PublishIndex(vault, meta)
+    await index.build()
+    const transformer = new ContentTransformer(new ContentResolver(vault, meta, index), index, vault)
+    const r = await transformer.transform('/a.md')
+    expect(r.assetRefs.map((a) => a.vaultPath).sort()).toEqual(['/x.png', '/y.jpg'])
+  })
+})
+
+describe('ContentTransformer.transform() - cover', () => {
+  it('absolutizes cover vault path to /content/<hash>/_assets/<file>', async () => {
+    const vault = new InMemoryVaultFs({
+      '/books/B/B.md': '---\nnotedrop-publish: true\nnotedrop-render: book\nnotedrop-cover: "_assets/cover.png"\n---\nbody',
+      '/books/B/_assets/cover.png': 'PNG'
+    })
+    const meta = new FakeMetaCache({
+      '/books/B/B.md': {
+        frontmatter: {
+          'notedrop-publish': true,
+          'notedrop-render': 'book',
+          'notedrop-cover': '_assets/cover.png'
+        }
+      }
+    })
+    const index = new PublishIndex(vault, meta)
+    await index.build()
+    const item = index.getByPath('/books/B/B.md')!
+    const transformer = new ContentTransformer(new ContentResolver(vault, meta, index), index, vault)
+    const r = await transformer.transform('/books/B/B.md')
+    expect(r.outputFrontmatter.cover).toBe(`/content/${item.hash}/_assets/cover.png`)
+    expect(r.assetRefs.find((a) => a.vaultPath === '/books/B/_assets/cover.png')).toBeDefined()
+  })
+
+  it('cover null when notedrop-cover absent', async () => {
+    const { transformer } = await setup({
+      '/a.md': { body: 'x', fm: { 'notedrop-publish': true } }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.outputFrontmatter.cover).toBeNull()
+  })
+
+  it('cover not found in vault -> null + warning', async () => {
+    const vault = new InMemoryVaultFs({
+      '/a.md': '---\nnotedrop-publish: true\nnotedrop-cover: "missing.png"\n---'
+    })
+    const meta = new FakeMetaCache({
+      '/a.md': {
+        frontmatter: { 'notedrop-publish': true, 'notedrop-cover': 'missing.png' }
+      }
+    })
+    const index = new PublishIndex(vault, meta)
+    await index.build()
+    const transformer = new ContentTransformer(new ContentResolver(vault, meta, index), index, vault)
+    const r = await transformer.transform('/a.md')
+    expect(r.outputFrontmatter.cover).toBeNull()
+    expect(r.warnings.some((w) => w.includes('cover'))).toBe(true)
+  })
+})
+
+describe('ContentTransformer.transform() - customCss', () => {
+  it('inline notedrop-css populates customCss', async () => {
+    const { transformer } = await setup({
+      '/a.md': {
+        body: 'x',
+        fm: { 'notedrop-publish': true, 'notedrop-css': '.page { color: red; }' }
+      }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.outputFrontmatter.customCss).toContain('.page { color: red; }')
+  })
+
+  it('file css is read and appended after inline', async () => {
+    const vault = new InMemoryVaultFs({
+      '/a.md': '---\nnotedrop-publish: true\nnotedrop-css: ".inline { color: red; }"\nnotedrop-css-file: "styles/book.css"\n---',
+      '/styles/book.css': '.file { color: blue; }'
+    })
+    const meta = new FakeMetaCache({
+      '/a.md': {
+        frontmatter: {
+          'notedrop-publish': true,
+          'notedrop-css': '.inline { color: red; }',
+          'notedrop-css-file': 'styles/book.css'
+        }
+      }
+    })
+    const index = new PublishIndex(vault, meta)
+    await index.build()
+    const transformer = new ContentTransformer(new ContentResolver(vault, meta, index), index, vault)
+    const r = await transformer.transform('/a.md')
+    expect(r.outputFrontmatter.customCss).toContain('.inline { color: red; }')
+    expect(r.outputFrontmatter.customCss).toContain('.file { color: blue; }')
+    const inlinePos = r.outputFrontmatter.customCss!.indexOf('.inline')
+    const filePos = r.outputFrontmatter.customCss!.indexOf('.file')
+    expect(inlinePos).toBeLessThan(filePos)
+  })
+
+  it('missing css file -> warning, customCss falls back to inline only', async () => {
+    const { transformer } = await setup({
+      '/a.md': {
+        body: 'x',
+        fm: {
+          'notedrop-publish': true,
+          'notedrop-css': '.x {}',
+          'notedrop-css-file': 'nope.css'
+        }
+      }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.outputFrontmatter.customCss).toContain('.x {}')
+    expect(r.outputFrontmatter.customCss).not.toContain('nope.css')
+    expect(r.warnings.some((w) => w.includes('nope.css'))).toBe(true)
+  })
+
+  it('strips @import lines (CSS sanitize)', async () => {
+    const { transformer } = await setup({
+      '/a.md': {
+        body: 'x',
+        fm: {
+          'notedrop-publish': true,
+          'notedrop-css': '@import "evil.css";\n.ok { color: red; }'
+        }
+      }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.outputFrontmatter.customCss).not.toContain('@import')
+    expect(r.outputFrontmatter.customCss).toContain('.ok { color: red; }')
+  })
+
+  it('strips url(http*) (CSS sanitize)', async () => {
+    const { transformer } = await setup({
+      '/a.md': {
+        body: 'x',
+        fm: {
+          'notedrop-publish': true,
+          'notedrop-css': '.x { background: url(https://evil.com/track.png); }'
+        }
+      }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.outputFrontmatter.customCss).not.toContain('https://evil.com')
+  })
+
+  it('strips expression() (CSS sanitize)', async () => {
+    const { transformer } = await setup({
+      '/a.md': {
+        body: 'x',
+        fm: {
+          'notedrop-publish': true,
+          'notedrop-css': '.x { width: expression(alert(1)); }'
+        }
+      }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.outputFrontmatter.customCss).not.toContain('expression(')
+  })
+
+  it('customCss null when neither key set', async () => {
+    const { transformer } = await setup({
+      '/a.md': { body: 'x', fm: { 'notedrop-publish': true } }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.outputFrontmatter.customCss).toBeNull()
+  })
+})
