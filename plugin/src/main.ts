@@ -4,6 +4,9 @@ import { ObsidianMetaCache } from './infrastructure/ObsidianMetaCache.js'
 import { VaultEventBridge } from './infrastructure/VaultEventBridge.js'
 import { PublishIndex } from './domain/PublishIndex.js'
 import { BookAssembler } from './domain/BookAssembler.js'
+import { ContentResolver } from './domain/ContentResolver.js'
+import { ContentTransformer } from './domain/ContentTransformer.js'
+import { ManifestBuilder } from './domain/ManifestBuilder.js'
 import {
   DEFAULT_SETTINGS,
   type PluginSettings
@@ -13,6 +16,7 @@ import { shareNote } from './commands/shareNote.js'
 import { unshareNote } from './commands/unshareNote.js'
 import { openSharedList } from './commands/openSharedList.js'
 import { copyShareUrl } from './commands/copyShareUrl.js'
+import { publishVault } from './commands/publishVault.js'
 import type { PublishedItem } from './domain/types.js'
 
 export default class NotedropPlugin extends Plugin {
@@ -21,6 +25,9 @@ export default class NotedropPlugin extends Plugin {
   private meta!: ObsidianMetaCache
   private index!: PublishIndex
   private bridge!: VaultEventBridge
+  private resolver!: ContentResolver
+  private transformer!: ContentTransformer
+  private manifestBuilder!: ManifestBuilder
 
   override async onload(): Promise<void> {
     await this.loadSettings()
@@ -28,6 +35,9 @@ export default class NotedropPlugin extends Plugin {
     this.vault = new ObsidianVaultFs(this.app)
     this.meta = new ObsidianMetaCache(this.app)
     this.index = new PublishIndex(this.vault, this.meta)
+    this.resolver = new ContentResolver(this.vault, this.meta, this.index)
+    this.transformer = new ContentTransformer(this.resolver, this.index, this.vault)
+    this.manifestBuilder = new ManifestBuilder(this.index)
     const bookAssembler = new BookAssembler(this.vault, this.meta)
     this.bridge = new VaultEventBridge(this.meta, this.index)
 
@@ -59,6 +69,22 @@ export default class NotedropPlugin extends Plugin {
       name: 'Copy share URL',
       callback: () => {
         void copyShareUrl(this.app, this.index, this.settings)
+      }
+    })
+    this.addCommand({
+      id: 'publish-vault',
+      name: 'Publish vault to GitHub',
+      callback: () => {
+        void publishVault(
+          {
+            app: this.app,
+            vault: this.vault,
+            index: this.index,
+            transformer: this.transformer,
+            manifestBuilder: this.manifestBuilder
+          },
+          this.settings
+        )
       }
     })
 
