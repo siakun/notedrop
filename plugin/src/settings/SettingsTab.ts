@@ -44,6 +44,32 @@ export class NotedropSettingTab extends PluginSettingTab {
       )
 
     new Setting(containerEl)
+      .setName('Target branch')
+      .setDesc('발행 commit 을 push 할 브랜치 (기본 main).')
+      .addText((text) =>
+        text
+          .setPlaceholder('main')
+          .setValue(this.plugin.settings.targetBranch)
+          .onChange(async (value) => {
+            this.plugin.settings.targetBranch = value.trim() || 'main'
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(containerEl)
+      .setName('Public root')
+      .setDesc('변환 산출물이 push 될 레포 내 경로 (기본 viewer/public).')
+      .addText((text) =>
+        text
+          .setPlaceholder('viewer/public')
+          .setValue(this.plugin.settings.publicRoot)
+          .onChange(async (value) => {
+            this.plugin.settings.publicRoot = value.trim().replace(/^\/|\/$/g, '') || 'viewer/public'
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(containerEl)
       .setName('Share URL base')
       .setDesc('공유 URL 의 베이스 (예: https://siakun.github.io/notedrop).')
       .addText((text) =>
