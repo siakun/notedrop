@@ -55,6 +55,29 @@ export class PublishIndex {
     return [...this.byHash.values()]
   }
 
+  get(hash: string): PublishedItem | null {
+    return this.byHash.get(hash) ?? null
+  }
+
+  getByPath(filePath: string): PublishedItem | null {
+    const hash = this.pathToHash.get(filePath)
+    return hash ? (this.byHash.get(hash) ?? null) : null
+  }
+
+  getBySlug(slug: string): PublishedItem | null {
+    const hash = this.slugToHash.get(slug)
+    return hash ? (this.byHash.get(hash) ?? null) : null
+  }
+
+  listChildren(parentHash: string): PublishedItem[] {
+    const out: PublishedItem[] = []
+    for (const item of this.byHash.values()) {
+      if (item.parent === parentHash) out.push(item)
+    }
+    out.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    return out
+  }
+
   private deriveItem(
     filePath: string,
     fm: Record<string, unknown>,
