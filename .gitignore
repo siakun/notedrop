@@ -1,0 +1,14 @@
+# claude
+.claude/
+
+# build artifacts
+main.js
+main.js.map
+
+# node
+node_modules/
+plugin/coverage/
+
+# editor
+.DS_Store
+Thumbs.db
