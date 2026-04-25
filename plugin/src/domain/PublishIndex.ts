@@ -78,6 +78,48 @@ export class PublishIndex {
     return out
   }
 
+  upsert(filePath: string): PublishedItem | null {
+    const fm = this.meta.getFrontmatter(filePath)
+    if (!fm || fm['notedrop-publish'] !== true) {
+      this.remove(filePath)
+      return null
+    }
+    const existing = this.getByPath(filePath)
+    const now = new Date().toISOString()
+    const draft = this.deriveItem(filePath, fm, now)
+    const merged: PublishedItem = existing
+      ? { ...draft, hash: existing.hash, publishedAt: existing.publishedAt }
+      : draft
+    if (existing) this.detach(existing)
+    this.insert(merged)
+    return this.getByPath(filePath)
+  }
+
+  remove(filePath: string): void {
+    const existing = this.getByPath(filePath)
+    if (!existing) return
+    this.detach(existing)
+  }
+
+  rename(oldPath: string, newPath: string): void {
+    const existing = this.getByPath(oldPath)
+    if (!existing) return
+    this.detach(existing)
+    const renamed: PublishedItem = {
+      ...existing,
+      filePath: newPath,
+      title: deriveTitle(newPath),
+      updatedAt: new Date().toISOString()
+    }
+    this.insert(renamed)
+  }
+
+  private detach(item: PublishedItem): void {
+    this.byHash.delete(item.hash)
+    this.pathToHash.delete(item.filePath)
+    if (item.slug) this.slugToHash.delete(item.slug)
+  }
+
   private deriveItem(
     filePath: string,
     fm: Record<string, unknown>,

@@ -273,3 +273,123 @@ describe('PublishIndex.query', () => {
     expect(idx.listChildren(bookHash)).toEqual([])
   })
 })
+
+describe('PublishIndex.mutations', () => {
+  let vault: InMemoryVaultFs
+  let meta: FakeMetaCache
+  let idx: PublishIndex
+
+  beforeEach(async () => {
+    vault = new InMemoryVaultFs({})
+    meta = new FakeMetaCache({})
+    idx = new PublishIndex(vault, meta)
+    await idx.build()
+  })
+
+  it('upsert returns null when frontmatter has no publish flag', async () => {
+    await vault.writeFile('/a.md', '')
+    meta.seed('/a.md', { frontmatter: {} })
+    expect(idx.upsert('/a.md')).toBeNull()
+  })
+
+  it('upsert inserts a new item when publish flag is true', async () => {
+    await vault.writeFile('/a.md', '')
+    meta.seed('/a.md', { frontmatter: { 'notedrop-publish': true } })
+    const item = idx.upsert('/a.md')
+    expect(item).not.toBeNull()
+    expect(idx.list()).toHaveLength(1)
+  })
+
+  it('upsert preserves hash and publishedAt on update', async () => {
+    await vault.writeFile('/a.md', '')
+    meta.seed('/a.md', { frontmatter: { 'notedrop-publish': true } })
+    const first = idx.upsert('/a.md')!
+    meta.seed('/a.md', {
+      frontmatter: { 'notedrop-publish': true, 'notedrop-slug': 'changed' }
+    })
+    const second = idx.upsert('/a.md')!
+    expect(second.hash).toBe(first.hash)
+    expect(second.publishedAt).toBe(first.publishedAt)
+    expect(second.slug).toBe('changed')
+  })
+
+  it('upsert refreshes updatedAt', async () => {
+    await vault.writeFile('/a.md', '')
+    meta.seed('/a.md', { frontmatter: { 'notedrop-publish': true } })
+    const first = idx.upsert('/a.md')!
+    await new Promise((r) => setTimeout(r, 5))
+    meta.seed('/a.md', { frontmatter: { 'notedrop-publish': true } })
+    const second = idx.upsert('/a.md')!
+    expect(second.updatedAt >= first.updatedAt).toBe(true)
+  })
+
+  it('upsert returns null and removes item when publish flag flips false', async () => {
+    await vault.writeFile('/a.md', '')
+    meta.seed('/a.md', { frontmatter: { 'notedrop-publish': true } })
+    const item = idx.upsert('/a.md')!
+    meta.seed('/a.md', { frontmatter: { 'notedrop-publish': false } })
+    expect(idx.upsert('/a.md')).toBeNull()
+    expect(idx.get(item.hash)).toBeNull()
+  })
+
+  it('remove deletes by file path', async () => {
+    await vault.writeFile('/a.md', '')
+    meta.seed('/a.md', { frontmatter: { 'notedrop-publish': true } })
+    idx.upsert('/a.md')
+    idx.remove('/a.md')
+    expect(idx.getByPath('/a.md')).toBeNull()
+    expect(idx.list()).toEqual([])
+  })
+
+  it('remove is a no-op for unknown path', () => {
+    expect(() => idx.remove('/missing.md')).not.toThrow()
+  })
+
+  it('rename keeps hash, updates path mapping', async () => {
+    await vault.writeFile('/old.md', '')
+    meta.seed('/old.md', { frontmatter: { 'notedrop-publish': true } })
+    const item = idx.upsert('/old.md')!
+    idx.rename('/old.md', '/new.md')
+    expect(idx.getByPath('/old.md')).toBeNull()
+    const moved = idx.getByPath('/new.md')
+    expect(moved?.hash).toBe(item.hash)
+    expect(moved?.filePath).toBe('/new.md')
+    expect(moved?.title).toBe('new')
+  })
+
+  it('rename is a no-op when oldPath unknown', () => {
+    expect(() => idx.rename('/nope.md', '/new.md')).not.toThrow()
+    expect(idx.getByPath('/new.md')).toBeNull()
+  })
+
+  it('slug collision on upsert appends -2', async () => {
+    await vault.writeFile('/a.md', '')
+    await vault.writeFile('/b.md', '')
+    meta.seed('/a.md', {
+      frontmatter: { 'notedrop-publish': true, 'notedrop-slug': 'foo' }
+    })
+    meta.seed('/b.md', {
+      frontmatter: { 'notedrop-publish': true, 'notedrop-slug': 'foo' }
+    })
+    idx.upsert('/a.md')
+    const second = idx.upsert('/b.md')!
+    expect(second.slug).toBe('foo-2')
+    expect(idx.warnings).toContainEqual(
+      expect.objectContaining({ code: 'slug-collision' })
+    )
+  })
+
+  it('upsert frees old slug when slug changes', async () => {
+    await vault.writeFile('/a.md', '')
+    meta.seed('/a.md', {
+      frontmatter: { 'notedrop-publish': true, 'notedrop-slug': 'old' }
+    })
+    idx.upsert('/a.md')
+    meta.seed('/a.md', {
+      frontmatter: { 'notedrop-publish': true, 'notedrop-slug': 'new' }
+    })
+    idx.upsert('/a.md')
+    expect(idx.getBySlug('old')).toBeNull()
+    expect(idx.getBySlug('new')).not.toBeNull()
+  })
+})
