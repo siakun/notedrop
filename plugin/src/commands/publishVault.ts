@@ -5,12 +5,19 @@ import type { PublishIndex } from '../domain/PublishIndex.js'
 import type { ContentTransformer } from '../domain/ContentTransformer.js'
 import type { ManifestBuilder } from '../domain/ManifestBuilder.js'
 import type { PluginSettings } from '../settings/PluginSettings.js'
-import { PublishOrchestrator } from '../domain/PublishOrchestrator.js'
+import {
+  PublishOrchestrator,
+  type PublishedFile
+} from '../domain/PublishOrchestrator.js'
 import {
   GitHubPublisher,
   GitHubAuthError,
   GitHubApiError
 } from '../infrastructure/GitHubPublisher.js'
+
+import indexHtml from '../embedded/index.html'
+import appJs from '../embedded/app.js.txt'
+import styleCss from '../embedded/style.css'
 
 export type PublishDeps = {
   app: App
@@ -48,6 +55,10 @@ export async function publishVault(
   const startNotice = new Notice('notedrop: 발행 준비 중…', 0)
   try {
     const plan = await orchestrator.plan()
+    if (settings.publishViewerAssets) {
+      const viewerFiles = collectViewerFiles(settings.publicRoot)
+      plan.files.push(...viewerFiles)
+    }
     startNotice.setMessage(
       `notedrop: ${plan.files.length} 파일 GitHub 에 push 중…`
     )
@@ -63,8 +74,9 @@ export async function publishVault(
     )
 
     startNotice.hide()
+    const initSuffix = outcome.initialized ? ' (초기 commit)' : ''
     new Notice(
-      `notedrop: 발행 완료 (commit ${outcome.commitSha.slice(0, 7)}, ${outcome.changedFiles}개 파일)`,
+      `notedrop: 발행 완료${initSuffix} (commit ${outcome.commitSha.slice(0, 7)}, ${outcome.changedFiles}개 파일)`,
       8000
     )
     if (plan.warnings.length > 0) {
@@ -76,10 +88,34 @@ export async function publishVault(
     if (err instanceof GitHubAuthError) {
       new Notice('notedrop: GitHub 인증 실패 — PAT 와 권한을 확인하세요', 8000)
     } else if (err instanceof GitHubApiError) {
-      new Notice(`notedrop: GitHub API 오류 (${err.status})`, 8000)
+      const hint = hintFor(err.status)
+      new Notice(`notedrop: GitHub API 오류 (${err.status})${hint}`, 10000)
     } else {
       new Notice(`notedrop: 발행 실패 — ${(err as Error).message}`, 8000)
     }
     console.error('notedrop publish failed', err)
+  }
+}
+
+function collectViewerFiles(publicRoot: string): PublishedFile[] {
+  const root = publicRoot.trim().replace(/^\/|\/$/g, '')
+  const prefix = root === '' ? '' : `${root}/`
+  return [
+    { kind: 'text', path: `${prefix}index.html`, content: indexHtml },
+    { kind: 'text', path: `${prefix}app.js`, content: appJs },
+    { kind: 'text', path: `${prefix}style.css`, content: styleCss }
+  ]
+}
+
+function hintFor(status: number): string {
+  switch (status) {
+    case 404:
+      return ' — 레포·브랜치 이름 확인'
+    case 422:
+      return ' — 빈 repo·잘못된 input·rate limit 가능'
+    case 409:
+      return ' — repo 빈 상태 또는 충돌'
+    default:
+      return ''
   }
 }

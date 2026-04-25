@@ -12,6 +12,9 @@ plugin/coverage/
 # viewer build output
 viewer/dist/
 
+# embedded viewer assets (regenerated each plugin build)
+plugin/src/embedded/
+
 # editor
 .DS_Store
 Thumbs.db

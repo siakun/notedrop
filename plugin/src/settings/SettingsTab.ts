@@ -58,13 +58,25 @@ export class NotedropSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Public root')
-      .setDesc('변환 산출물이 push 될 레포 내 경로 (기본 viewer/public).')
+      .setDesc('변환 산출물이 push 될 레포 내 경로. 기본 빈 값 = repo root (별도 share repo 권장). 모노레포면 viewer/public.')
       .addText((text) =>
         text
-          .setPlaceholder('viewer/public')
+          .setPlaceholder('(empty = root)')
           .setValue(this.plugin.settings.publicRoot)
           .onChange(async (value) => {
-            this.plugin.settings.publicRoot = value.trim().replace(/^\/|\/$/g, '') || 'viewer/public'
+            this.plugin.settings.publicRoot = value.trim().replace(/^\/|\/$/g, '')
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(containerEl)
+      .setName('Publish viewer assets')
+      .setDesc('publish 마다 뷰어 (index.html/app.js/style.css) 도 같이 push. 별도 share repo 면 ON.')
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.publishViewerAssets)
+          .onChange(async (value) => {
+            this.plugin.settings.publishViewerAssets = value
             await this.plugin.saveSettings()
           })
       )

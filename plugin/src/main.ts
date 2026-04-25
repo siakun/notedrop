@@ -2,11 +2,13 @@ import { Plugin } from 'obsidian'
 import { ObsidianVaultFs } from './infrastructure/ObsidianVaultFs.js'
 import { ObsidianMetaCache } from './infrastructure/ObsidianMetaCache.js'
 import { VaultEventBridge } from './infrastructure/VaultEventBridge.js'
+import { PreviewServer } from './infrastructure/PreviewServer.js'
 import { PublishIndex } from './domain/PublishIndex.js'
 import { BookAssembler } from './domain/BookAssembler.js'
 import { ContentResolver } from './domain/ContentResolver.js'
 import { ContentTransformer } from './domain/ContentTransformer.js'
 import { ManifestBuilder } from './domain/ManifestBuilder.js'
+import { PublishOrchestrator } from './domain/PublishOrchestrator.js'
 import {
   DEFAULT_SETTINGS,
   type PluginSettings
@@ -17,6 +19,11 @@ import { unshareNote } from './commands/unshareNote.js'
 import { openSharedList } from './commands/openSharedList.js'
 import { copyShareUrl } from './commands/copyShareUrl.js'
 import { publishVault } from './commands/publishVault.js'
+import {
+  startPreviewServer,
+  stopPreviewServer,
+  openPreviewInBrowser
+} from './commands/previewServer.js'
 import type { PublishedItem } from './domain/types.js'
 
 export default class NotedropPlugin extends Plugin {
@@ -28,6 +35,8 @@ export default class NotedropPlugin extends Plugin {
   private resolver!: ContentResolver
   private transformer!: ContentTransformer
   private manifestBuilder!: ManifestBuilder
+  private orchestrator!: PublishOrchestrator
+  private preview!: PreviewServer
 
   override async onload(): Promise<void> {
     await this.loadSettings()
@@ -38,38 +47,40 @@ export default class NotedropPlugin extends Plugin {
     this.resolver = new ContentResolver(this.vault, this.meta, this.index)
     this.transformer = new ContentTransformer(this.resolver, this.index, this.vault)
     this.manifestBuilder = new ManifestBuilder(this.index)
+    this.orchestrator = new PublishOrchestrator(
+      this.vault,
+      this.index,
+      this.transformer,
+      this.manifestBuilder,
+      { publicRoot: this.settings.publicRoot, generatedBy: 'notedrop-plugin' }
+    )
     const bookAssembler = new BookAssembler(this.vault, this.meta)
     this.bridge = new VaultEventBridge(this.meta, this.index)
+    this.preview = new PreviewServer(this.orchestrator, this.vault, {
+      port: this.settings.previewPort
+    })
 
     this.addSettingTab(new NotedropSettingTab(this.app, this))
 
     this.addCommand({
       id: 'share-note',
       name: 'Share this note',
-      callback: () => {
-        void shareNote(this.app, this.index)
-      }
+      callback: () => { void shareNote(this.app, this.index) }
     })
     this.addCommand({
       id: 'unshare-note',
       name: 'Unshare this note',
-      callback: () => {
-        void unshareNote(this.app, this.index)
-      }
+      callback: () => { void unshareNote(this.app, this.index) }
     })
     this.addCommand({
       id: 'open-shared-list',
       name: 'Open shared list',
-      callback: () => {
-        openSharedList(this.app, this.index)
-      }
+      callback: () => { openSharedList(this.app, this.index) }
     })
     this.addCommand({
       id: 'copy-share-url',
       name: 'Copy share URL',
-      callback: () => {
-        void copyShareUrl(this.app, this.index, this.settings)
-      }
+      callback: () => { void copyShareUrl(this.app, this.index, this.settings) }
     })
     this.addCommand({
       id: 'publish-vault',
@@ -87,6 +98,21 @@ export default class NotedropPlugin extends Plugin {
         )
       }
     })
+    this.addCommand({
+      id: 'start-preview',
+      name: 'Start preview server',
+      callback: () => { void startPreviewServer(this.app, this.preview) }
+    })
+    this.addCommand({
+      id: 'stop-preview',
+      name: 'Stop preview server',
+      callback: () => { void stopPreviewServer(this.app, this.preview) }
+    })
+    this.addCommand({
+      id: 'open-preview',
+      name: 'Open preview in browser',
+      callback: () => { void openPreviewInBrowser(this.app, this.preview) }
+    })
 
     this.app.workspace.onLayoutReady(async () => {
       await this.index.build({ bookAssembler })
@@ -94,13 +120,24 @@ export default class NotedropPlugin extends Plugin {
       console.log(
         `notedrop: indexed ${this.index.list().length} published note(s)`
       )
+      if (this.settings.autoStartPreview) {
+        try {
+          const status = await this.preview.start()
+          if (status.state === 'running') {
+            console.log(`notedrop preview: ${status.url}`)
+          }
+        } catch (err) {
+          console.warn('notedrop preview auto start 실패:', err)
+        }
+      }
     })
 
     console.log('notedrop loaded')
   }
 
-  override onunload(): void {
+  override async onunload(): Promise<void> {
     this.bridge?.stop()
+    await this.preview?.stop()
     console.log('notedrop unloaded')
   }
 
@@ -115,5 +152,14 @@ export default class NotedropPlugin extends Plugin {
 
   indexList(): PublishedItem[] {
     return this.index?.list() ?? []
+  }
+
+  previewStatus(): ReturnType<PreviewServer['getStatus']> {
+    return this.preview?.getStatus() ?? { state: 'stopped' }
+  }
+
+  async togglePreview(start: boolean): Promise<void> {
+    if (start) await this.preview.start()
+    else await this.preview.stop()
   }
 }
