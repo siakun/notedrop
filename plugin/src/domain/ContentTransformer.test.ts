@@ -320,3 +320,89 @@ describe('ContentTransformer.transform() - wikilink safety', () => {
     expect(r.markdown).toContain('see ref')
   })
 })
+
+describe('ContentTransformer.transform() - embed safety', () => {
+  it('unpublished embed becomes placeholder block', async () => {
+    const { transformer } = await setup({
+      '/a.md': { body: '![[Private]]', fm: { 'notedrop-publish': true } }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).toContain(
+      '<div class="notedrop-embed-placeholder">접근할 수 없는 문서: Private</div>'
+    )
+    expect(r.markdown).not.toContain('![[Private]]')
+  })
+
+  it('published embed inlines target body (frontmatter stripped)', async () => {
+    const { transformer } = await setup({
+      '/a.md': { body: 'pre ![[B]] post', fm: { 'notedrop-publish': true } },
+      '/B.md': { body: 'inner content', fm: { 'notedrop-publish': true } }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).toContain('inner content')
+    expect(r.markdown).not.toContain('![[B]]')
+    expect(r.markdown).toContain('pre ')
+    expect(r.markdown).toContain(' post')
+  })
+
+  it('published embed runs HIDE on inner body before inlining', async () => {
+    const { transformer } = await setup({
+      '/a.md': { body: '![[B]]', fm: { 'notedrop-publish': true } },
+      '/B.md': {
+        body: 'visible %%hidden%% rest',
+        fm: { 'notedrop-publish': true }
+      }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).toContain('visible')
+    expect(r.markdown).toContain('rest')
+    expect(r.markdown).not.toContain('hidden')
+  })
+
+  it('embed inside an embedded note becomes depth-overflow placeholder', async () => {
+    const { transformer } = await setup({
+      '/a.md': { body: '![[B]]', fm: { 'notedrop-publish': true } },
+      '/B.md': {
+        body: 'before ![[C]] after',
+        fm: { 'notedrop-publish': true }
+      },
+      '/C.md': { body: 'C body', fm: { 'notedrop-publish': true } }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).toContain(
+      '<div class="notedrop-embed-overflow">(임베드 깊이 초과)</div>'
+    )
+    expect(r.markdown).not.toContain('C body')
+  })
+
+  it('depth-overflow applies to unpublished inner embeds too', async () => {
+    const { transformer } = await setup({
+      '/a.md': { body: '![[B]]', fm: { 'notedrop-publish': true } },
+      '/B.md': { body: '![[Private]]', fm: { 'notedrop-publish': true } }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).toContain('notedrop-embed-overflow')
+    expect(r.markdown).not.toContain('Private')
+  })
+
+  it('inner wikilinks of an embedded body still get safety net', async () => {
+    const { transformer } = await setup({
+      '/a.md': { body: '![[B]]', fm: { 'notedrop-publish': true } },
+      '/B.md': { body: '[[Private]]', fm: { 'notedrop-publish': true } }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).toContain('notedrop-deadlink')
+    expect(r.markdown).not.toContain('[[Private]]')
+  })
+
+  it('cyclic embed A -> B -> A is broken at depth limit', async () => {
+    const { transformer } = await setup({
+      '/A.md': { body: 'one ![[B]] two', fm: { 'notedrop-publish': true } },
+      '/B.md': { body: '![[A]]', fm: { 'notedrop-publish': true } }
+    })
+    const r = await transformer.transform('/A.md')
+    expect(r.markdown).toContain('notedrop-embed-overflow')
+    expect(r.markdown).toContain('one ')
+    expect(r.markdown).toContain(' two')
+  })
+})
