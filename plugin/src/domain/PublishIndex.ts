@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { VaultFs } from '../ports/VaultFs.js'
 import type { MetaCache } from '../ports/MetaCache.js'
-import type { PublishedItem } from './types.js'
+import type { PublishedItem, ChapterPlan } from './types.js'
 import type { RenderMode } from '../types.js'
 
 export type SeedEntry = {
@@ -17,6 +17,13 @@ export type IndexWarning = {
   message: string
 }
 
+export type IndexEvent = 'added' | 'changed' | 'removed'
+export type IndexEventHandler = (hash: string) => void
+
+type BookAssemblerLike = {
+  assemble(entryFilePath: string): Promise<ChapterPlan>
+}
+
 const VALID_RENDER: ReadonlySet<string> = new Set(['book', 'doc'])
 
 export class PublishIndex {
@@ -24,6 +31,7 @@ export class PublishIndex {
   private pathToHash: Map<string, string> = new Map()
   private slugToHash: Map<string, string> = new Map()
   private seeds: Map<string, SeedEntry> = new Map()
+  private listeners: Map<IndexEvent, Set<IndexEventHandler>> = new Map()
   warnings: IndexWarning[] = []
 
   constructor(private vault: VaultFs, private meta: MetaCache) {}
@@ -32,7 +40,20 @@ export class PublishIndex {
     for (const e of entries) this.seeds.set(e.filePath, e)
   }
 
-  async build(): Promise<void> {
+  on(event: IndexEvent, handler: IndexEventHandler): () => void {
+    let set = this.listeners.get(event)
+    if (!set) { set = new Set(); this.listeners.set(event, set) }
+    set.add(handler)
+    return () => { set!.delete(handler) }
+  }
+
+  private emit(event: IndexEvent, hash: string): void {
+    const set = this.listeners.get(event)
+    if (!set) return
+    for (const handler of set) handler(hash)
+  }
+
+  async build(deps: { bookAssembler?: BookAssemblerLike } = {}): Promise<void> {
     this.byHash.clear()
     this.pathToHash.clear()
     this.slugToHash.clear()
@@ -48,6 +69,29 @@ export class PublishIndex {
 
       const item = this.deriveItem(filePath, fm, now)
       this.insert(item)
+    }
+
+    if (deps.bookAssembler) await this.linkBooks(deps.bookAssembler)
+  }
+
+  private async linkBooks(bookAssembler: BookAssemblerLike): Promise<void> {
+    const entries = [...this.byHash.values()].filter((it) => it.render === 'book')
+    for (const entry of entries) {
+      const plan = await bookAssembler.assemble(entry.filePath)
+      const linked: string[] = []
+      for (const ch of plan.chapters) {
+        const child = this.getByPath(ch.filePath)
+        if (!child) continue
+        const updated: PublishedItem = {
+          ...child,
+          type: 'chapter',
+          parent: entry.hash,
+          order: ch.order
+        }
+        this.byHash.set(child.hash, updated)
+        linked.push(child.hash)
+      }
+      this.byHash.set(entry.hash, { ...entry, chapters: linked })
     }
   }
 
@@ -81,7 +125,11 @@ export class PublishIndex {
   upsert(filePath: string): PublishedItem | null {
     const fm = this.meta.getFrontmatter(filePath)
     if (!fm || fm['notedrop-publish'] !== true) {
-      this.remove(filePath)
+      const removed = this.getByPath(filePath)
+      if (removed) {
+        this.detach(removed)
+        this.emit('removed', removed.hash)
+      }
       return null
     }
     const existing = this.getByPath(filePath)
@@ -92,13 +140,16 @@ export class PublishIndex {
       : draft
     if (existing) this.detach(existing)
     this.insert(merged)
-    return this.getByPath(filePath)
+    const stored = this.getByPath(filePath)!
+    this.emit(existing ? 'changed' : 'added', stored.hash)
+    return stored
   }
 
   remove(filePath: string): void {
     const existing = this.getByPath(filePath)
     if (!existing) return
     this.detach(existing)
+    this.emit('removed', existing.hash)
   }
 
   rename(oldPath: string, newPath: string): void {

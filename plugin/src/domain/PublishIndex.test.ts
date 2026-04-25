@@ -393,3 +393,133 @@ describe('PublishIndex.mutations', () => {
     expect(idx.getBySlug('new')).not.toBeNull()
   })
 })
+
+import type { ChapterPlan } from './types.js'
+
+class StubBookAssembler {
+  constructor(private plans: Map<string, ChapterPlan>) {}
+  async assemble(entryFilePath: string): Promise<ChapterPlan> {
+    return this.plans.get(entryFilePath) ?? { source: 'folder-scan' as const, chapters: [] }
+  }
+}
+
+describe('PublishIndex.events', () => {
+  let vault: InMemoryVaultFs
+  let meta: FakeMetaCache
+  let idx: PublishIndex
+
+  beforeEach(async () => {
+    vault = new InMemoryVaultFs({})
+    meta = new FakeMetaCache({})
+    idx = new PublishIndex(vault, meta)
+    await idx.build()
+  })
+
+  it('emits "added" on first upsert', async () => {
+    await vault.writeFile('/a.md', '')
+    meta.seed('/a.md', { frontmatter: { 'notedrop-publish': true } })
+    const seen: string[] = []
+    idx.on('added', (h) => { seen.push(h) })
+    const item = idx.upsert('/a.md')!
+    expect(seen).toEqual([item.hash])
+  })
+
+  it('emits "changed" on update upsert', async () => {
+    await vault.writeFile('/a.md', '')
+    meta.seed('/a.md', { frontmatter: { 'notedrop-publish': true } })
+    const item = idx.upsert('/a.md')!
+    const seen: string[] = []
+    idx.on('changed', (h) => { seen.push(h) })
+    meta.seed('/a.md', { frontmatter: { 'notedrop-publish': true, 'notedrop-slug': 'x' } })
+    idx.upsert('/a.md')
+    expect(seen).toEqual([item.hash])
+  })
+
+  it('emits "removed" on remove', async () => {
+    await vault.writeFile('/a.md', '')
+    meta.seed('/a.md', { frontmatter: { 'notedrop-publish': true } })
+    const item = idx.upsert('/a.md')!
+    const seen: string[] = []
+    idx.on('removed', (h) => { seen.push(h) })
+    idx.remove('/a.md')
+    expect(seen).toEqual([item.hash])
+  })
+
+  it('on() unsubscribe stops further notifications', async () => {
+    await vault.writeFile('/a.md', '')
+    meta.seed('/a.md', { frontmatter: { 'notedrop-publish': true } })
+    const seen: string[] = []
+    const off = idx.on('added', (h) => { seen.push(h) })
+    off()
+    idx.upsert('/a.md')
+    expect(seen).toEqual([])
+  })
+})
+
+describe('PublishIndex book linking', () => {
+  it('linkBooks wires parent/chapters/order for book entries', async () => {
+    const vault = new InMemoryVaultFs({})
+    const meta = new FakeMetaCache({})
+    await vault.writeFile('/books/B/B.md', '')
+    await vault.writeFile('/books/B/01.md', '')
+    await vault.writeFile('/books/B/02.md', '')
+    meta.seed('/books/B/B.md', {
+      frontmatter: { 'notedrop-publish': true, 'notedrop-render': 'book' }
+    })
+    meta.seed('/books/B/01.md', { frontmatter: { 'notedrop-publish': true } })
+    meta.seed('/books/B/02.md', { frontmatter: { 'notedrop-publish': true } })
+
+    const idx = new PublishIndex(vault, meta)
+    const stub = new StubBookAssembler(new Map([
+      ['/books/B/B.md', {
+        source: 'folder-scan' as const,
+        chapters: [
+          { filePath: '/books/B/01.md', order: 1 },
+          { filePath: '/books/B/02.md', order: 2 }
+        ]
+      }]
+    ]))
+
+    await idx.build({ bookAssembler: stub })
+
+    const entry = idx.getByPath('/books/B/B.md')!
+    const ch1 = idx.getByPath('/books/B/01.md')!
+    const ch2 = idx.getByPath('/books/B/02.md')!
+
+    expect(entry.type).toBe('entry')
+    expect(entry.chapters).toEqual([ch1.hash, ch2.hash])
+    expect(ch1.type).toBe('chapter')
+    expect(ch1.parent).toBe(entry.hash)
+    expect(ch1.order).toBe(1)
+    expect(idx.listChildren(entry.hash).map((it) => it.hash)).toEqual([
+      ch1.hash, ch2.hash
+    ])
+  })
+
+  it('linkBooks ignores chapter paths not in the index', async () => {
+    const vault = new InMemoryVaultFs({})
+    const meta = new FakeMetaCache({})
+    await vault.writeFile('/books/B/B.md', '')
+    await vault.writeFile('/books/B/01.md', '')
+    meta.seed('/books/B/B.md', {
+      frontmatter: { 'notedrop-publish': true, 'notedrop-render': 'book' }
+    })
+    meta.seed('/books/B/01.md', { frontmatter: { 'notedrop-publish': true } })
+
+    const idx = new PublishIndex(vault, meta)
+    const stub = new StubBookAssembler(new Map([
+      ['/books/B/B.md', {
+        source: 'folder-scan' as const,
+        chapters: [
+          { filePath: '/books/B/01.md', order: 1 },
+          { filePath: '/books/B/missing.md', order: 2 }
+        ]
+      }]
+    ]))
+
+    await idx.build({ bookAssembler: stub })
+
+    const entry = idx.getByPath('/books/B/B.md')!
+    expect(entry.chapters).toHaveLength(1)
+  })
+})
