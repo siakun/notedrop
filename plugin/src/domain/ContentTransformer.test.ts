@@ -140,3 +140,101 @@ describe('ContentTransformer.transform() - frontmatter', () => {
     expect(r.assetRefs).toEqual([])
   })
 })
+
+describe('ContentTransformer.transform() - HIDE policy', () => {
+  it('removes single-line %% comment %%', async () => {
+    const { transformer } = await setup({
+      '/a.md': {
+        body: 'before %%hidden%% after',
+        fm: { 'notedrop-publish': true }
+      }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).not.toContain('hidden')
+    expect(r.markdown).not.toContain('%%')
+    expect(r.markdown).toContain('before')
+    expect(r.markdown).toContain('after')
+  })
+
+  it('removes multi-line %% comment %% spanning lines', async () => {
+    const { transformer } = await setup({
+      '/a.md': {
+        body: 'one\n%%\nhidden\nstuff\n%%\ntwo',
+        fm: { 'notedrop-publish': true }
+      }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).not.toContain('hidden')
+    expect(r.markdown).not.toContain('stuff')
+    expect(r.markdown).toContain('one')
+    expect(r.markdown).toContain('two')
+  })
+
+  it('removes Waypoint block (%% Begin Waypoint %% ... %% End Waypoint %%)', async () => {
+    const { transformer } = await setup({
+      '/a.md': {
+        body: 'intro\n%% Begin Waypoint %%\n- [[ch1]]\n- [[ch2]]\n%% End Waypoint %%\noutro',
+        fm: { 'notedrop-publish': true }
+      }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).not.toContain('Waypoint')
+    expect(r.markdown).not.toContain('ch1')
+    expect(r.markdown).not.toContain('ch2')
+    expect(r.markdown).toContain('intro')
+    expect(r.markdown).toContain('outro')
+  })
+
+  it('removes multiple %% blocks in one file', async () => {
+    const { transformer } = await setup({
+      '/a.md': {
+        body: '%%a%% mid %%b%% end',
+        fm: { 'notedrop-publish': true }
+      }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).not.toContain('%%')
+    expect(r.markdown).not.toMatch(/\ba\b/)
+    expect(r.markdown).not.toMatch(/\bb\b/)
+    expect(r.markdown).toContain('mid')
+    expect(r.markdown).toContain('end')
+  })
+
+  it('handles %% at the very start and end', async () => {
+    const { transformer } = await setup({
+      '/a.md': {
+        body: '%%first%%body%%last%%',
+        fm: { 'notedrop-publish': true }
+      }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).not.toContain('first')
+    expect(r.markdown).not.toContain('last')
+    expect(r.markdown).toContain('body')
+  })
+
+  it('does not strip text that merely contains %% in inline code', async () => {
+    const { transformer } = await setup({
+      '/a.md': {
+        body: '`example: %%foo%%` and more',
+        fm: { 'notedrop-publish': true }
+      }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).toContain('` and more')
+  })
+
+  it('frontmatter never appears in output body', async () => {
+    const { transformer } = await setup({
+      '/a.md': {
+        body: 'body',
+        fm: { 'notedrop-publish': true, 'mood': 'okay', 'source': 'private' }
+      }
+    })
+    const r = await transformer.transform('/a.md')
+    expect(r.markdown).not.toContain('mood')
+    expect(r.markdown).not.toContain('source')
+    expect(r.markdown).not.toContain('private')
+    expect(r.markdown).not.toContain('---')
+  })
+})
