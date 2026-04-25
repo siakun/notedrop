@@ -209,3 +209,67 @@ describe('PublishIndex.build()', () => {
     expect(item.publishedAt).toBe('2026-01-01T00:00:00.000Z')
   })
 })
+
+describe('PublishIndex.query', () => {
+  let vault: InMemoryVaultFs
+  let meta: FakeMetaCache
+  let idx: PublishIndex
+
+  beforeEach(async () => {
+    vault = new InMemoryVaultFs({})
+    meta = new FakeMetaCache({})
+    await vault.writeFile('/books/B/B.md', '')
+    await vault.writeFile('/books/B/01.md', '')
+    await vault.writeFile('/notes/solo.md', '')
+    meta.seed('/books/B/B.md', {
+      frontmatter: {
+        'notedrop-publish': true,
+        'notedrop-render': 'book',
+        'notedrop-slug': 'b'
+      }
+    })
+    meta.seed('/books/B/01.md', {
+      frontmatter: { 'notedrop-publish': true }
+    })
+    meta.seed('/notes/solo.md', {
+      frontmatter: { 'notedrop-publish': true, 'notedrop-slug': 'solo' }
+    })
+    idx = new PublishIndex(vault, meta)
+    await idx.build()
+  })
+
+  it('get(hash) returns item by hash', () => {
+    const all = idx.list()
+    const item = all[0]!
+    expect(idx.get(item.hash)).toEqual(item)
+  })
+
+  it('get(hash) returns null for unknown hash', () => {
+    expect(idx.get('00000000000000000000000000000000')).toBeNull()
+  })
+
+  it('getByPath returns item by file path', () => {
+    expect(idx.getByPath('/notes/solo.md')?.slug).toBe('solo')
+  })
+
+  it('getByPath returns null for unknown path', () => {
+    expect(idx.getByPath('/missing.md')).toBeNull()
+  })
+
+  it('getBySlug returns item by slug', () => {
+    expect(idx.getBySlug('b')?.filePath).toBe('/books/B/B.md')
+  })
+
+  it('getBySlug returns null for unknown slug', () => {
+    expect(idx.getBySlug('nope')).toBeNull()
+  })
+
+  it('list() returns all items', () => {
+    expect(idx.list()).toHaveLength(3)
+  })
+
+  it('listChildren returns items whose parent matches the given hash', () => {
+    const bookHash = idx.getByPath('/books/B/B.md')!.hash
+    expect(idx.listChildren(bookHash)).toEqual([])
+  })
+})
