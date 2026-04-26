@@ -76,7 +76,7 @@ describe('PublishOrchestrator', () => {
       .filter((f) => f.kind === 'text' && f.path.endsWith('/index.md'))
       .map((f) => f.path)
     for (const path of indexes) {
-      expect(path).toMatch(/^viewer\/public\/content\/[a-f0-9]{32}\/index\.md$/)
+      expect(path).toMatch(/^viewer\/public\/content\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\/index\.md$/)
     }
   })
 })

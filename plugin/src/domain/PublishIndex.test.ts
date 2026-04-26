@@ -3,7 +3,7 @@ import { PublishIndex } from './PublishIndex.js'
 import { InMemoryVaultFs } from '../testing/InMemoryVaultFs.js'
 import { FakeMetaCache } from '../testing/FakeMetaCache.js'
 
-const HASH_RE = /^[0-9a-f]{32}$/
+const HASH_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 describe('PublishIndex.build()', () => {
   let vault: InMemoryVaultFs
@@ -52,7 +52,7 @@ describe('PublishIndex.build()', () => {
     expect(idx.list()).toEqual([])
   })
 
-  it('generates a 32-char hex hash for each new note', async () => {
+  it('generates a dashed UUID hash for each new note', async () => {
     await vault.writeFile('/a.md', '')
     meta.seed('/a.md', { frontmatter: { 'notedrop-publish': true } })
     const idx = new PublishIndex(vault, meta)
@@ -355,6 +355,17 @@ describe('PublishIndex.mutations', () => {
     expect(moved?.hash).toBe(item.hash)
     expect(moved?.filePath).toBe('/new.md')
     expect(moved?.title).toBe('new')
+  })
+
+  it('rename emits changed event with same hash', async () => {
+    await vault.writeFile('/old2.md', '')
+    meta.seed('/old2.md', { frontmatter: { 'notedrop-publish': true } })
+    await idx.build()
+    const item = idx.getByPath('/old2.md')!
+    const calls: string[] = []
+    idx.on('changed', (h) => calls.push(h))
+    idx.rename('/old2.md', '/renamed2.md')
+    expect(calls).toEqual([item.hash])
   })
 
   it('rename is a no-op when oldPath unknown', () => {

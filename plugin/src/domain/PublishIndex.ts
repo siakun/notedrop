@@ -163,6 +163,7 @@ export class PublishIndex {
       updatedAt: new Date().toISOString()
     }
     this.insert(renamed)
+    this.emit('changed', renamed.hash)
   }
 
   private detach(item: PublishedItem): void {
@@ -261,7 +262,7 @@ export class PublishIndex {
   private newHash(): string {
     let attempt = 0
     while (attempt < 4) {
-      const candidate = randomUUID().replace(/-/g, '')
+      const candidate = randomUUID()
       if (!this.byHash.has(candidate)) return candidate
       attempt += 1
     }

@@ -1,3 +1,5 @@
+import type { SeedEntry } from '../domain/PublishIndex.js'
+
 export type PluginSettings = {
   githubPat: string
   targetRepo: string
@@ -8,6 +10,7 @@ export type PluginSettings = {
   autoStartPreview: boolean
   autoUnpublish: boolean
   shareUrlBase: string
+  publishedSeeds: SeedEntry[]
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -19,5 +22,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   previewPort: 4321,
   autoStartPreview: false,
   autoUnpublish: false,
-  shareUrlBase: ''
+  shareUrlBase: '',
+  publishedSeeds: []
 }

@@ -112,13 +112,22 @@ export class NotedropSettingTab extends PluginSettingTab {
 
     const previewStatus = this.plugin.previewStatus()
     const isRunning = previewStatus.state === 'running'
+    const previewDesc = createFragment((frag) => {
+      if (isRunning) {
+        frag.appendText('실행 중 — ')
+        const link = frag.createEl('a', {
+          text: previewStatus.url,
+          href: previewStatus.url
+        })
+        link.setAttr('target', '_blank')
+        link.setAttr('rel', 'noopener')
+      } else {
+        frag.appendText('중지됨. 시작하면 로컬 라이브 프리뷰가 활성화됩니다.')
+      }
+    })
     new Setting(containerEl)
       .setName('Preview server')
-      .setDesc(
-        isRunning
-          ? `실행 중 — ${previewStatus.url}`
-          : '중지됨. 시작하면 로컬 라이브 프리뷰가 활성화됩니다.'
-      )
+      .setDesc(previewDesc)
       .addButton((btn) => {
         if (isRunning) {
           btn
