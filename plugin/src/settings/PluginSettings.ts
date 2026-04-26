@@ -11,6 +11,7 @@ export type PluginSettings = {
   autoUnpublish: boolean
   publishedSeeds: SeedEntry[]
   unpublishedChanges: boolean
+  lastPublishedDigest: string | null
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -23,5 +24,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   autoStartPreview: false,
   autoUnpublish: false,
   publishedSeeds: [],
-  unpublishedChanges: true
+  unpublishedChanges: true,
+  lastPublishedDigest: null
 }
