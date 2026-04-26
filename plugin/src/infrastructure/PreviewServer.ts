@@ -156,7 +156,7 @@ export class PreviewServer {
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', 'http://localhost')
-    const pathname = decodeURIComponent(url.pathname)
+    const pathname = stripBasePath(decodeURIComponent(url.pathname))
 
     if (pathname === '/events') return this.handleEvents(req, res)
 
@@ -252,6 +252,16 @@ export class PreviewServer {
     req.on('close', cleanup)
     req.on('error', cleanup)
   }
+}
+
+const BASE_PATHS = ['/notedrop']
+
+function stripBasePath(pathname: string): string {
+  for (const base of BASE_PATHS) {
+    if (pathname === base) return '/'
+    if (pathname.startsWith(`${base}/`)) return pathname.slice(base.length)
+  }
+  return pathname
 }
 
 function candidatePaths(pathname: string): string[] {
