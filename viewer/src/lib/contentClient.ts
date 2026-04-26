@@ -1,61 +1,50 @@
 import type { PageContent, PageFrontmatter } from '@/types/content'
 import type { ItemType, RenderMode } from '@/types/manifest'
+import { Resource } from './resource'
+import { logger } from './logger'
 
-const cache = new Map<string, PageContent>()
-const inflight = new Map<string, Promise<PageContent>>()
-const subscribers = new Set<(hash: string) => void>()
+const resource = new Resource<PageContent>(async (hash) => {
+  const res = await fetch(`content/${hash}/index.md`, { cache: 'no-store' })
+  if (!res.ok) {
+    logger.error('content', `fetch failed (${hash}): ${res.status}`)
+    throw new Error(`content fetch failed (${hash}): ${res.status}`)
+  }
+  const raw = await res.text()
+  const parsed = parsePageMarkdown(raw)
+  logger.debug('content', `fetched ${hash}`, {
+    bodyLength: parsed.body.length,
+    title: parsed.frontmatter.title
+  })
+  return parsed
+})
 
-export async function fetchContent(hash: string, force = false): Promise<PageContent> {
-  if (!force) {
-    const cached = cache.get(hash)
-    if (cached) return cached
-    const pending = inflight.get(hash)
-    if (pending) return pending
-  }
-  const promise = (async () => {
-    const res = await fetch(`content/${hash}/index.md`, { cache: 'no-store' })
-    if (!res.ok) throw new Error(`content fetch failed (${hash}): ${res.status}`)
-    const raw = await res.text()
-    const parsed = parsePageMarkdown(raw)
-    cache.set(hash, parsed)
-    return parsed
-  })()
-  inflight.set(hash, promise)
-  try {
-    return await promise
-  } finally {
-    inflight.delete(hash)
-  }
+export function fetchContent(hash: string, force = false): Promise<PageContent> {
+  return resource.get(hash, force)
 }
 
 export function invalidateContent(hash: string): void {
-  cache.delete(hash)
-  for (const fn of subscribers) {
-    try { fn(hash) } catch {}
-  }
+  resource.invalidate(hash)
 }
 
 export function invalidateAllContent(): void {
-  const hashes = Array.from(cache.keys())
-  cache.clear()
-  for (const fn of subscribers) {
-    for (const h of hashes) {
-      try { fn(h) } catch {}
-    }
-  }
+  resource.invalidateAll()
 }
 
 export function subscribeContent(fn: (hash: string) => void): () => void {
-  subscribers.add(fn)
-  return () => subscribers.delete(fn)
+  return resource.subscribe(fn)
 }
 
 export function peekContent(hash: string): PageContent | null {
-  return cache.get(hash) ?? null
+  return resource.peek(hash)
 }
 
 const FENCE = '---\n'
 
+/**
+ * `---\n<yaml>\n---\n<body>` 형식 markdown 파싱. ContentTransformer 가
+ * 만든 PageFrontmatter 형식의 단순 key:value 라인만 처리 (gray-matter 의존
+ * 절감).
+ */
 export function parsePageMarkdown(raw: string): PageContent {
   if (!raw.startsWith(FENCE)) {
     return { frontmatter: defaultFrontmatter(), body: raw }

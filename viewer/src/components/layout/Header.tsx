@@ -1,6 +1,6 @@
 'use client'
 
-import ViewSettingsPanel from './ViewSettingsPanel'
+import ViewSettingsPanel from '@/components/panels/ViewSettingsPanel'
 
 export default function Header({ crumbLabel }: { crumbLabel: string | null }) {
   return (

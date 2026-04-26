@@ -1,38 +1,32 @@
 import type { Manifest } from '@/types/manifest'
+import { Resource } from './resource'
+import { logger } from './logger'
 
-let cached: Manifest | null = null
-let inflight: Promise<Manifest> | null = null
-const subscribers = new Set<() => void>()
+const SINGLETON_KEY = '__manifest__'
 
-export async function fetchManifest(force = false): Promise<Manifest> {
-  if (!force && cached) return cached
-  if (!force && inflight) return inflight
-  inflight = (async () => {
-    const res = await fetch('manifest.json', { cache: 'no-store' })
-    if (!res.ok) throw new Error(`manifest fetch failed: ${res.status}`)
-    const data = (await res.json()) as Manifest
-    cached = data
-    return data
-  })()
-  try {
-    return await inflight
-  } finally {
-    inflight = null
+const resource = new Resource<Manifest>(async () => {
+  const res = await fetch('manifest.json', { cache: 'no-store' })
+  if (!res.ok) {
+    logger.error('manifest', `fetch failed: ${res.status}`)
+    throw new Error(`manifest fetch failed: ${res.status}`)
   }
+  const data = (await res.json()) as Manifest
+  logger.debug('manifest', 'fetched', { itemsCount: data.items.length })
+  return data
+})
+
+export function fetchManifest(force = false): Promise<Manifest> {
+  return resource.get(SINGLETON_KEY, force)
 }
 
 export function invalidateManifest(): void {
-  cached = null
-  for (const fn of subscribers) {
-    try { fn() } catch {}
-  }
+  resource.invalidate(SINGLETON_KEY)
 }
 
 export function subscribeManifest(fn: () => void): () => void {
-  subscribers.add(fn)
-  return () => subscribers.delete(fn)
+  return resource.subscribe(() => fn())
 }
 
 export function peekManifest(): Manifest | null {
-  return cached
+  return resource.peek(SINGLETON_KEY)
 }
