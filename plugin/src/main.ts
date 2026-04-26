@@ -18,7 +18,10 @@ import { COMMAND_REGISTRY } from './commands/registry.js'
 import { DirtyTracker } from './services/DirtyTracker.js'
 import { SeedPersistence } from './services/SeedPersistence.js'
 import { createPlanFactory } from './services/PlanFactory.js'
+import { FileLogger } from './services/Logger.js'
 import type { PluginContext } from './services/PluginContext.js'
+
+const PLUGIN_VERSION = '0.1.39'
 
 /**
  * Plugin entry. Hexagonal 정신상 main.ts 는:
@@ -59,6 +62,12 @@ export default class NotedropPlugin extends Plugin {
     })
 
     const saveSettings = (): Promise<void> => this.saveSettings()
+    const logger = new FileLogger({
+      app: this.app,
+      pluginId: 'notedrop',
+      pluginVersion: PLUGIN_VERSION,
+      isDebugMode: () => this.settings.debugMode
+    })
     const buildPlan = createPlanFactory(
       { vault, index, transformer, manifestBuilder },
       this.settings
@@ -86,8 +95,23 @@ export default class NotedropPlugin extends Plugin {
       saveSettings,
       buildPlan,
       dirtyTracker,
-      seedPersistence: this.seedPersistence
+      seedPersistence: this.seedPersistence,
+      logger
     }
+
+    logger.info('lifecycle', 'plugin onload', {
+      version: PLUGIN_VERSION,
+      debugMode: this.settings.debugMode,
+      targetRepo: this.settings.targetRepo,
+      publicRoot: this.settings.publicRoot,
+      publishViewerAssets: this.settings.publishViewerAssets,
+      previewPort: this.settings.previewPort,
+      autoStartPreview: this.settings.autoStartPreview,
+      publishedSeedsCount: this.settings.publishedSeeds.length,
+      hasBaseline: this.settings.lastPublishedDigest !== null,
+      lastPublishedFilesCount: this.settings.lastPublishedFiles
+        ? Object.keys(this.settings.lastPublishedFiles).length : 0
+    })
 
     index.seed(this.seedPersistence.loadNormalizedSeeds())
     this.seedPersistence.start()

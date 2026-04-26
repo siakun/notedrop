@@ -18,6 +18,12 @@ export type PluginSettings = {
   unpublishedChanges: boolean
   lastPublishedDigest: string | null
   lastPublishedFiles: Record<string, PublishedFileSnapshot> | null
+  /**
+   * 개발자 모드 — 켜져 있으면 모든 publish/preview 진단 정보가
+   * `<vault>/.obsidian/plugins/notedrop/notedrop.log` 에 append 로 기록.
+   * 끄면 console 만 (옵시디언 DevTools 콘솔). 기본 false.
+   */
+  debugMode: boolean
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -32,5 +38,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   publishedSeeds: [],
   unpublishedChanges: true,
   lastPublishedDigest: null,
-  lastPublishedFiles: null
+  lastPublishedFiles: null,
+  debugMode: false
 }

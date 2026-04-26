@@ -11,6 +11,7 @@ import {
 import type { PluginContext } from '../services/PluginContext.js'
 import type { PlanFactory } from '../services/PlanFactory.js'
 import type { DirtyTracker } from '../services/DirtyTracker.js'
+import type { Logger } from '../services/Logger.js'
 import type { CommandDef } from './types.js'
 
 /**
@@ -23,6 +24,7 @@ export type PublishDeps = {
   index: PublishIndex
   buildPlan: PlanFactory
   dirtyTracker: DirtyTracker
+  logger: Logger
   onPublishSuccess?: () => Promise<void>
   /**
    * true 면 변경 감지 (lastPublishedFiles 비교) 우회 + plan.files 전체
@@ -73,6 +75,7 @@ export function buildPublishDeps(ctx: PluginContext): PublishDeps {
     index: ctx.index,
     buildPlan: ctx.buildPlan,
     dirtyTracker: ctx.dirtyTracker,
+    logger: ctx.logger,
     onPublishSuccess: async () => {
       const snapshot = await ctx.dirtyTracker.computeSnapshot()
       await ctx.dirtyTracker.confirmPublished(snapshot)
@@ -102,26 +105,40 @@ export async function executePublish(
     return
   }
 
+  deps.logger.info('publish', 'publish 시작', {
+    skipChangeDetection: deps.skipChangeDetection ?? false,
+    indexedItemCount: deps.index.list().length,
+    targetRepo: settings.targetRepo,
+    targetBranch: settings.targetBranch,
+    publicRoot: settings.publicRoot,
+    publishViewerAssets: settings.publishViewerAssets
+  })
+
   const startNotice = new Notice('notedrop: 발행 준비 중…', 0)
   try {
     const plan = await deps.buildPlan()
     const totalFileCount = plan.files.length
 
-    // 진단 로그: plan.files 의 모든 path. manifest.json 이 plan 에
-    // *애초에 들어가 있는지* 사용자가 콘솔에서 직접 확인 가능.
-    const PLUGIN_VERSION = '0.1.38'
     const manifestEntries = plan.files.filter((f) => f.path.endsWith('manifest.json'))
     const nojekyllEntries = plan.files.filter((f) => f.path.endsWith('.nojekyll'))
-    console.log(
-      `notedrop publish [v${PLUGIN_VERSION}]: plan.files=${totalFileCount}, ` +
-      `manifest entries=${manifestEntries.length} (${manifestEntries.map((f) => f.path).join(', ') || 'NONE'}), ` +
-      `.nojekyll entries=${nojekyllEntries.length}`
-    )
+    const contentEntries = plan.files.filter((f) => f.path.includes('/content/') || f.path.startsWith('content/'))
+    deps.logger.info('publish', 'plan 빌드 완료', {
+      totalFileCount,
+      manifestEntries: manifestEntries.map((f) => f.path),
+      nojekyllEntries: nojekyllEntries.map((f) => f.path),
+      contentEntries: contentEntries.map((f) => f.path),
+      manifestItemsCount: plan.manifest.items.length,
+      manifestItemTypes: plan.manifest.items.map((i) => `${i.type}:${i.title}`),
+      warnings: plan.warnings,
+      // 모든 path 의 ~30 sample (전체는 너무 길어 first/last 만)
+      pathSampleFirst10: plan.files.slice(0, 10).map((f) => f.path),
+      pathSampleLast10: plan.files.slice(-10).map((f) => f.path)
+    })
     if (manifestEntries.length === 0) {
-      console.error(
-        'notedrop publish: ⚠️ plan.files 에 manifest.json 이 없습니다 — ' +
-        'PublishOrchestrator 또는 PlanFactory 의 버그 가능. 콘솔 로그 + plugin version 보고 의무.'
-      )
+      deps.logger.error('publish', '⚠️ plan.files 에 manifest.json 이 없음', {
+        totalFileCount,
+        publicRoot: settings.publicRoot
+      })
     }
 
     // 변경 감지: lastPublishedFiles 와 비교해 변경된 path 만 push.
@@ -132,35 +149,35 @@ export async function executePublish(
       const diff = await deps.dirtyTracker.computeDiff()
       if (!diff.hasBaseline) {
         pushReason = '첫 publish (baseline 없음 — 일괄 push)'
-        console.log(
-          `notedrop publish: ${pushReason}. files=${totalFileCount}`
-        )
+        deps.logger.info('publish', pushReason, { totalFileCount })
       } else {
         const changedPaths = new Set([...diff.added, ...diff.modified])
-        // Meta 파일 (manifest.json, .nojekyll) 은 항상 push.
-        // 사유: dirtyTracker 는 plugin 내부 record 를 비교하지 share repo
-        // 의 실제 상태를 모름. 어느 시점에 publish 가 fail 했지만 baseline
-        // 에는 등록된 케이스 — manifest 가 plugin 과 share repo 사이 mismatch
-        // 인데도 변경 감지가 "변경 없음" 으로 분류 → 영구히 안 push 되는 버그.
-        // manifest 는 ~수 KB 라 매번 push 부담 없음.
         const isAlwaysPush = (path: string) =>
           path.endsWith('manifest.json') || path.endsWith('.nojekyll')
+        const beforeFilter = plan.files.length
         plan.files = plan.files.filter(
           (f) => changedPaths.has(f.path) || isAlwaysPush(f.path)
         )
         pushReason = `변경 감지 (added ${diff.added.length}, modified ${diff.modified.length}, removed ${diff.removed.length}, +meta)`
-        console.log(
-          `notedrop publish: ${pushReason}. files=${plan.files.length}/${totalFileCount}`
-        )
+        deps.logger.info('publish', pushReason, {
+          beforeFilter,
+          afterFilter: plan.files.length,
+          addedPaths: diff.added,
+          modifiedPaths: diff.modified,
+          removedPaths: diff.removed,
+          afterFilterPaths: plan.files.map((f) => f.path)
+        })
         if (plan.files.length === totalFileCount && totalFileCount > 10) {
-          console.warn(
-            'notedrop publish: 모든 파일이 변경됨으로 분류 — baseline mismatch 가능 ' +
-            '(plugin update 또는 settings 변경 후 첫 publish?). 본 publish 후 baseline 갱신되어 ' +
-            '다음 publish 부터 변경된 파일만 push.'
-          )
+          deps.logger.warn('publish', '모든 파일이 변경됨으로 분류 — baseline mismatch 가능', {
+            totalFileCount
+          })
           pushReason = 'baseline mismatch — 일괄 push (다음 publish 부터 변경 감지 작동)'
         }
       }
+    } else {
+      deps.logger.info('publish', '변경 감지 우회 (force) — plan.files 일괄 push', {
+        totalFileCount
+      })
     }
 
     if (plan.files.length === 0) {
@@ -183,10 +200,22 @@ export async function executePublish(
       branch: settings.targetBranch,
       token: settings.githubPat
     })
+    deps.logger.info('publish', 'GitHub Tree API 호출 시작', {
+      pushFileCount: plan.files.length,
+      pushPaths: plan.files.map((f) => f.path)
+    })
+    const apiStart = Date.now()
     const outcome = await publisher.publish(
       plan,
       `notedrop: publish ${plan.manifest.items.length} item(s) at ${plan.manifest.generatedAt}`
     )
+    deps.logger.info('publish', 'GitHub Tree API 완료', {
+      commitSha: outcome.commitSha,
+      changedFiles: outcome.changedFiles,
+      url: outcome.url,
+      initialized: outcome.initialized,
+      durationMs: Date.now() - apiStart
+    })
 
     startNotice.hide()
     const initSuffix = outcome.initialized ? ' (초기 commit)' : ''
@@ -207,15 +236,23 @@ export async function executePublish(
     }
   } catch (err) {
     startNotice.hide()
+    const errorData = {
+      name: (err as Error).name,
+      message: (err as Error).message,
+      stack: (err as Error).stack,
+      status: err instanceof GitHubApiError ? err.status : null
+    }
     if (err instanceof GitHubAuthError) {
       new Notice('notedrop: GitHub 인증 실패 — PAT 와 권한을 확인하세요', 8000)
+      deps.logger.error('publish', 'GitHub 인증 실패', errorData)
     } else if (err instanceof GitHubApiError) {
       const hint = hintFor(err.status)
       new Notice(`notedrop: GitHub API 오류 (${err.status})${hint}`, 10000)
+      deps.logger.error('publish', `GitHub API 오류 ${err.status}`, errorData)
     } else {
       new Notice(`notedrop: 발행 실패 — ${(err as Error).message}`, 8000)
+      deps.logger.error('publish', '발행 실패', errorData)
     }
-    console.error('notedrop publish failed', err)
   }
 }
 

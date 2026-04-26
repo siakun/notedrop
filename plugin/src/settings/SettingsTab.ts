@@ -302,5 +302,21 @@ export class NotedropSettingTab extends PluginSettingTab {
             }
           })
       )
+
+    new Setting(details)
+      .setName('Debug mode')
+      .setDesc(
+        '진단 정보를 .obsidian/plugins/notedrop/notedrop.log 에 append. ' +
+        '문제 보고 시 그 파일 첨부. 끄면 console (DevTools) 만 출력.'
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.ctx.settings.debugMode)
+          .onChange(async (value) => {
+            this.ctx.settings.debugMode = value
+            await this.ctx.saveSettings()
+            this.ctx.logger.info('settings', `debug mode = ${value}`)
+          })
+      )
   }
 }
