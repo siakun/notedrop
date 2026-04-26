@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
@@ -51,5 +51,33 @@ describe('EventLogger', () => {
     const entry = JSON.parse(content.trim())
     expect(entry.data.githubPat).toBe('ghp_***90')
     expect(entry.data.foo).toBe('visible')
+  })
+
+  it('동시 emit() 박아도 line 깨짐 0 (직렬화)', async () => {
+    const logger = new EventLogger({ logPath, pluginVersion: '0.1.47' })
+    // 50개 동시 emit
+    await Promise.all(
+      Array.from({ length: 50 }, (_, i) =>
+        logger.emit('concurrent_test', { index: i })
+      )
+    )
+    const content = await fs.readFile(logPath, 'utf-8')
+    const lines = content.trim().split('\n')
+    expect(lines).toHaveLength(50)
+    // 각 line 이 valid JSON 등록
+    for (const line of lines) {
+      const entry = JSON.parse(line)
+      expect(entry.type).toBe('concurrent_test')
+      expect(typeof entry.data.index).toBe('number')
+    }
+  })
+
+  it('logPath 빈 문자열 설정 시 emit() no-op (warn 1번 only)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const logger = new EventLogger({ logPath: '', pluginVersion: '0.1.47' })
+    await logger.emit('test', { foo: 'bar' })
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    expect(warnSpy.mock.calls[0][0]).toContain('logPath empty')
+    warnSpy.mockRestore()
   })
 })

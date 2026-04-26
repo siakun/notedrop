@@ -6,6 +6,8 @@ export type EventLoggerOptions = {
   pluginVersion: string
 }
 
+// Mirror of Logger.ts redactSecrets — keep in sync if adding keys.
+// Pre-lowercased here (cleaner than mixed-case + toLowerCase in Logger.ts:157).
 const SECRET_KEYS = ['githubpat', 'token', 'pat', 'authorization', 'auth']
 
 function maskSecrets(key: string, value: unknown): unknown {
@@ -18,7 +20,14 @@ function maskSecrets(key: string, value: unknown): unknown {
 }
 
 export class EventLogger {
-  constructor(private readonly options: EventLoggerOptions) {}
+  private writeQueue: Promise<void> = Promise.resolve()
+
+  constructor(private readonly options: EventLoggerOptions) {
+    // Issue 3: empty logPath 가 들어오면 emit() no-op + 한 번 warn
+    if (!options.logPath) {
+      console.warn('notedrop EventLogger: logPath empty, emit() 가 no-op')
+    }
+  }
 
   newTraceId(): string {
     return randomUUID()
@@ -29,6 +38,7 @@ export class EventLogger {
     data?: Record<string, unknown>,
     traceId?: string
   ): Promise<void> {
+    if (!this.options.logPath) return
     const entry: Record<string, unknown> = {
       timestamp: new Date().toISOString(),
       version: this.options.pluginVersion,
@@ -48,10 +58,14 @@ export class EventLogger {
         data: '<unserializable>'
       }) + '\n'
     }
-    try {
-      await fs.appendFile(this.options.logPath, line, 'utf-8')
-    } catch (err) {
-      console.warn('notedrop EventLogger: append 실패', err)
-    }
+    // 직렬화 — Windows 에서 line interleaving 회피
+    this.writeQueue = this.writeQueue.then(async () => {
+      try {
+        await fs.appendFile(this.options.logPath, line, 'utf-8')
+      } catch (err) {
+        console.warn('notedrop EventLogger: append 실패', err)
+      }
+    })
+    await this.writeQueue
   }
 }
