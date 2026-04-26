@@ -107,6 +107,7 @@ function collectViewerFiles(publicRoot: string): PublishedFile[] {
   const root = publicRoot.trim().replace(/^\/|\/$/g, '')
   const prefix = root === '' ? '' : `${root}/`
   return [
+    { kind: 'text', path: `${prefix}.nojekyll`, content: '' },
     { kind: 'text', path: `${prefix}index.html`, content: indexHtml },
     { kind: 'text', path: `${prefix}app.js`, content: appJs },
     { kind: 'text', path: `${prefix}style.css`, content: styleCss }
