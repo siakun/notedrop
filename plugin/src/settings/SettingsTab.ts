@@ -83,10 +83,10 @@ export class NotedropSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Share URL base')
-      .setDesc('공유 URL 의 베이스 (예: https://siakun.github.io/notedrop).')
+      .setDesc('GitHub Pages URL (예: https://siakun.github.io/notedrop-share). github.com 소스 URL 아님. Copy share URL 명령어가 base + /#/<hash>/ 형식으로 생성.')
       .addText((text) =>
         text
-          .setPlaceholder('https://siakun.github.io/notedrop')
+          .setPlaceholder('https://siakun.github.io/notedrop-share')
           .setValue(this.plugin.settings.shareUrlBase)
           .onChange(async (value) => {
             this.plugin.settings.shareUrlBase = value.trim().replace(/\/$/, '')
