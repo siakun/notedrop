@@ -501,9 +501,10 @@ body[data-layout='two-pages'] .app-shell.book .toc {
   height: 100%;
   overflow-y: auto;
 }
-body[data-layout='horizontal'] .app-shell.book article,
-body[data-layout='two-pages'] .app-shell.book article {
+body[data-layout='horizontal'] .app-shell article,
+body[data-layout='two-pages'] .app-shell article {
   height: 100%;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
