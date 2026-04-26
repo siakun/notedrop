@@ -107,6 +107,23 @@ export async function executePublish(
     const plan = await deps.buildPlan()
     const totalFileCount = plan.files.length
 
+    // 진단 로그: plan.files 의 모든 path. manifest.json 이 plan 에
+    // *애초에 들어가 있는지* 사용자가 콘솔에서 직접 확인 가능.
+    const PLUGIN_VERSION = '0.1.38'
+    const manifestEntries = plan.files.filter((f) => f.path.endsWith('manifest.json'))
+    const nojekyllEntries = plan.files.filter((f) => f.path.endsWith('.nojekyll'))
+    console.log(
+      `notedrop publish [v${PLUGIN_VERSION}]: plan.files=${totalFileCount}, ` +
+      `manifest entries=${manifestEntries.length} (${manifestEntries.map((f) => f.path).join(', ') || 'NONE'}), ` +
+      `.nojekyll entries=${nojekyllEntries.length}`
+    )
+    if (manifestEntries.length === 0) {
+      console.error(
+        'notedrop publish: ⚠️ plan.files 에 manifest.json 이 없습니다 — ' +
+        'PublishOrchestrator 또는 PlanFactory 의 버그 가능. 콘솔 로그 + plugin version 보고 의무.'
+      )
+    }
+
     // 변경 감지: lastPublishedFiles 와 비교해 변경된 path 만 push.
     // base_tree 가 변경 없는 path 자동 보존이라 blob/tree 등록 회수 절감.
     // force publish (skipChangeDetection=true) 는 일괄 push.
