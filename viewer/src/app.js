@@ -226,7 +226,10 @@ function setupViewSettings() {
     saveViewSettings(settings)
     applyViewSettings(settings)
     refreshUi()
-    requestAnimationFrame(updatePageIndicator)
+    requestAnimationFrame(() => {
+      applyLayoutPagination()
+      updatePageIndicator()
+    })
   }
 
   function refreshUi() {
@@ -256,6 +259,77 @@ function setupViewSettings() {
 
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)) }
 function round1(n) { return Math.round(n * 10) / 10 }
+function mmToPx(mm) { return mm * (96 / 25.4) }
+
+/* ─── Layout pagination (vertical mode = real paper-page divs) ──────── */
+
+function applyLayoutPagination() {
+  const content = document.querySelector('.entry-content')
+  if (!content) return
+  const layout = document.body.dataset.layout
+  unpaginate(content)
+  if (layout === 'vertical') {
+    const settings = loadViewSettings()
+    paginateVertical(content, settings)
+  }
+}
+
+function unpaginate(content) {
+  const sections = content.querySelectorAll(':scope > .paper-page')
+  if (sections.length === 0) return
+  for (const sec of sections) {
+    while (sec.firstChild) {
+      content.insertBefore(sec.firstChild, sec)
+    }
+    sec.remove()
+  }
+}
+
+function paginateVertical(content, settings) {
+  const dims = PAGE_DIMS[settings.pageSize] ?? PAGE_DIMS.A4
+  const innerHeightPx = mmToPx(dims.h - settings.marginTop - settings.marginBottom)
+  if (innerHeightPx <= 0) return
+
+  const flat = Array.from(content.children)
+  if (flat.length === 0) return
+
+  // Wrap all children in one initial paper-page so heights measure at correct width
+  const initialPage = createPaperPage()
+  for (const child of flat) initialPage.appendChild(child)
+  content.innerHTML = ''
+  content.appendChild(initialPage)
+
+  // Force layout and snapshot heights
+  const heights = flat.map((c) => c.offsetHeight)
+
+  // Decide page groups
+  const groups = [[]]
+  let used = 0
+  for (let i = 0; i < flat.length; i++) {
+    const h = heights[i]
+    const lastGroup = groups[groups.length - 1]
+    if (used + h > innerHeightPx && lastGroup.length > 0) {
+      groups.push([])
+      used = 0
+    }
+    groups[groups.length - 1].push(i)
+    used += h
+  }
+
+  // Create real pages
+  content.innerHTML = ''
+  for (const group of groups) {
+    const page = createPaperPage()
+    for (const idx of group) page.appendChild(flat[idx])
+    content.appendChild(page)
+  }
+}
+
+function createPaperPage() {
+  const page = document.createElement('section')
+  page.className = 'paper-page'
+  return page
+}
 
 /* ─── Page indicator (horizontal/two-pages) ─────────────────────────── */
 
@@ -502,7 +576,10 @@ async function render() {
   else if (route.kind === 'entry') result = renderEntry(route.hash, route.chapter)
   else { showError(new Error('알 수 없는 경로')); return }
   await Promise.resolve(result)
-  requestAnimationFrame(updatePageIndicator)
+  requestAnimationFrame(() => {
+    applyLayoutPagination()
+    updatePageIndicator()
+  })
 }
 
 function parseRoute() {
@@ -610,7 +687,6 @@ function renderShell(item, html, opts = {}) {
     : ''
   return `
     ${cover}
-    ${item ? `<h1 class="entry-title">${escape(item.title)}</h1>` : ''}
     <div class="entry-content">${html}</div>
   `
 }
@@ -647,7 +723,7 @@ function setCrumbs(items) {
   }
   crumbs.innerHTML = items
     .map((it) => `<a href="${it.href}">${escape(it.label)}</a>`)
-    .join(' / ')
+    .join('<span class="crumb-sep">/</span>')
 }
 
 function showError(err) {
