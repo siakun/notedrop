@@ -1,5 +1,5 @@
 import crypto from 'node:crypto'
-import { Plugin } from 'obsidian'
+import { Notice, Plugin } from 'obsidian'
 import { ObsidianVaultFs } from './infrastructure/ObsidianVaultFs.js'
 import { ObsidianMetaCache } from './infrastructure/ObsidianMetaCache.js'
 import { VaultEventBridge } from './infrastructure/VaultEventBridge.js'
@@ -99,6 +99,11 @@ export default class NotedropPlugin extends Plugin {
       callback: () => { void this.runPublish() }
     })
     this.addCommand({
+      id: 'force-publish-vault',
+      name: 'Force publish vault to GitHub (변경 없어도 강제)',
+      callback: () => { void this.runPublish({ force: true }) }
+    })
+    this.addCommand({
       id: 'start-preview',
       name: 'Start preview server',
       callback: () => { void startPreviewServer(this.app, this.preview) }
@@ -176,7 +181,21 @@ export default class NotedropPlugin extends Plugin {
     return this.settings.unpublishedChanges
   }
 
-  async runPublish(): Promise<void> {
+  async runPublish(options: { force?: boolean } = {}): Promise<void> {
+    if (!options.force) {
+      // dogfood lesson: 발행 버튼은 dirty=false 일 때 비활성, 그러나 명령어
+      // (Cmd+P → Publish) 는 항상 실행되었음. 둘은 동일 게이트로 통과해야
+      // 사용자 멘탈 모델 일치. force 옵션은 명시적 강제 publish 명령어 (v2)
+      // 또는 share repo 의 stale 자산 정리 같은 특수 케이스 진입점.
+      const dirty = await this.revalidateDirty()
+      if (!dirty) {
+        new Notice(
+          'notedrop: 변경 사항이 없습니다 — 발행 안 함 (강제 발행은 Force publish 명령어)',
+          5000
+        )
+        return
+      }
+    }
     await publishVault(
       {
         app: this.app,
