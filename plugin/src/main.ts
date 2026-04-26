@@ -204,6 +204,9 @@ export default class NotedropPlugin extends Plugin {
     if (this.seedPersistence) await this.seedPersistence.stop()
     this.ctx?.bridge?.stop()
     await this.ctx?.preview?.stop()
+    if (this.ctx?.logger && 'flush' in this.ctx.logger) {
+      await (this.ctx.logger as { flush?: () => Promise<void> }).flush?.()
+    }
     console.log('notedrop unloaded')
   }
 

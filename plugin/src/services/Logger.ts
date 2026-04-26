@@ -28,6 +28,7 @@ const MAX_LOG_BYTES = 10 * 1024 * 1024 // 10 MB rotation 한계
 
 export class FileLogger implements Logger {
   private logPath: string | null = null
+  private pendingWrites: Promise<void>[] = []
 
   constructor(private readonly options: LoggerOptions) {
     const adapter = options.app.vault.adapter as FileSystemAdapter
@@ -74,7 +75,12 @@ export class FileLogger implements Logger {
     consoleFn(line.trim())
     // file 은 debug mode 일 때만 (사용자가 명시 활성화)
     if (this.options.isDebugMode() && this.logPath) {
-      void this.appendToFile(line)
+      const p = this.appendToFile(line)
+      this.pendingWrites.push(p)
+      void p.finally(() => {
+        const idx = this.pendingWrites.indexOf(p)
+        if (idx >= 0) this.pendingWrites.splice(idx, 1)
+      })
     }
   }
 
@@ -116,6 +122,11 @@ export class FileLogger implements Logger {
     } catch (err) {
       console.warn('notedrop FileLogger: append 실패', err)
     }
+  }
+
+  /** plugin onunload 시 호출. pending fs.appendFile 모두 끝날 때까지 await. */
+  async flush(): Promise<void> {
+    await Promise.all(this.pendingWrites)
   }
 }
 
