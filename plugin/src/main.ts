@@ -19,9 +19,10 @@ import { DirtyTracker } from './services/DirtyTracker.js'
 import { SeedPersistence } from './services/SeedPersistence.js'
 import { createPlanFactory } from './services/PlanFactory.js'
 import { FileLogger } from './services/Logger.js'
+import { EventLogger } from './services/EventLogger.js'
 import type { PluginContext } from './services/PluginContext.js'
 
-const PLUGIN_VERSION = '0.1.46'
+const PLUGIN_VERSION = '0.1.47'
 
 /**
  * Plugin entry. Hexagonal 정신상 main.ts 는:
@@ -68,6 +69,26 @@ export default class NotedropPlugin extends Plugin {
       pluginVersion: PLUGIN_VERSION,
       isDebugMode: () => this.settings.debugMode
     })
+    // === 신규: EventLogger ===
+    const adapter = this.app.vault.adapter as import('obsidian').FileSystemAdapter
+    const eventLogPath = adapter.getBasePath
+      ? `${adapter.getBasePath()}/.obsidian/plugins/notedrop/events.jsonl`
+      : ''
+    const eventLogger = new EventLogger({
+      logPath: eventLogPath,
+      pluginVersion: PLUGIN_VERSION
+    })
+
+    // === 신규: devSnapshot factory ===
+    const devSnapshotFn = async () => {
+      const { buildDevSnapshot } = await import('./services/DevSnapshot.js')
+      return buildDevSnapshot({
+        settings: this.settings,
+        indexedNoteCount: index.list().length,
+        dirtyMarked: this.settings.unpublishedChanges
+      })
+    }
+
     const buildPlan = createPlanFactory(
       { vault, index, transformer, manifestBuilder },
       this.settings
@@ -96,7 +117,9 @@ export default class NotedropPlugin extends Plugin {
       buildPlan,
       dirtyTracker,
       seedPersistence: this.seedPersistence,
-      logger
+      logger,
+      eventLogger,
+      devSnapshot: devSnapshotFn
     }
 
     logger.info('lifecycle', 'plugin onload', {
@@ -111,6 +134,16 @@ export default class NotedropPlugin extends Plugin {
       hasBaseline: this.settings.lastPublishedDigest !== null,
       lastPublishedFilesCount: this.settings.lastPublishedFiles
         ? Object.keys(this.settings.lastPublishedFiles).length : 0
+    })
+
+    void eventLogger.emit('lifecycle_onload', {
+      version: PLUGIN_VERSION,
+      debugMode: this.settings.debugMode,
+      hasBaseline: this.settings.lastPublishedDigest !== null,
+      baselineFileCount: this.settings.lastPublishedFiles
+        ? Object.keys(this.settings.lastPublishedFiles).length : 0,
+      viewerCacheKeySet: this.settings.lastViewerCacheKey !== null,
+      indexedNoteCountAtLoad: 0
     })
 
     index.seed(this.seedPersistence.loadNormalizedSeeds())

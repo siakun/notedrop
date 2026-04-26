@@ -13,6 +13,7 @@ import type { DirtyTracker } from './DirtyTracker.js'
 import type { SeedPersistence } from './SeedPersistence.js'
 import type { PlanFactory } from './PlanFactory.js'
 import type { Logger } from './Logger.js'
+import type { EventLogger } from './EventLogger.js'
 
 /**
  * 의존 컨테이너 (DI Context). main.ts (Plugin entry) 가 build 후 commands/ +
@@ -40,4 +41,6 @@ export type PluginContext = {
   dirtyTracker: DirtyTracker
   seedPersistence: SeedPersistence
   logger: Logger
+  eventLogger: EventLogger
+  devSnapshot: () => Promise<import('./DevSnapshot.js').DevSnapshot>
 }
