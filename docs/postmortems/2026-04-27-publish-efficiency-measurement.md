@@ -195,21 +195,35 @@ postmortem 또는 핸드오프 기록.
 시 *측정 patch 우선 도입* (옵션 A 의 진단 patch 같은) → 측정값 → 본격 구현
 순서 권장.
 
-### 6.2 cache 의 fingerprint deterministic 의무
+### 6.2 cache 의 fingerprint deterministic 의무 (v0.1.46 해결됨)
 
 옵션 A 의 fingerprint = viewer.zip 의 sha256. zip 이 viewer/out/ 의 next
-build 결과 + zipSync. **next build 의 chunk hash 가 deterministic 안 함**
-(매 빌드마다 다른 chunk hash). 즉 plugin 재빌드마다 cache miss. 핸드오프
-§6.3 의 우려가 *현실화*.
+build 결과 + zipSync. 핸드오프 §6.3 의 우려가 *현실화* — share repo commit
+의 chunk hash 가 매 plugin 빌드마다 다름 (`cJGt25...` → `FJemeaP...` 등).
 
-대안 후보 (v2):
-- `viewer/next.config.mjs` 의 webpack `optimization.moduleIds: 'deterministic'`
-- 또는 Next.js 의 `experimental.deterministicChunkIds` (가능한지 검증)
-- 또는 chunk hash 자체가 아니라 *unpacked file content* 의 hash 합산을
-  fingerprint 로 사용 (chunk 이름 무관, 실 content 만)
+**검증 (2026-04-27)**:
 
-본 postmortem 시점에 대안 적용 안 함 — 옵션 B 로 명시 trigger 분리하면
-fingerprint 변동 영향 작음.
+같은 viewer source 의 두 번 빌드 → 142 file 중 *7 file 만 다름*. 모두
+**Next.js 의 random buildId** (`LPY3p4Z...` vs `pKu8xmw...`) 존재이 원인:
+
+- `_next/static/<buildId>/_buildManifest.js` (path 변경, content 동일)
+- `_next/static/<buildId>/_ssgManifest.js` (path 변경, content 동일)
+- `index.html`, `404.html`, `404/index.html`, `index.txt` (content 안 buildId 임베드)
+
+**해결 (v0.1.46 fix)**: `viewer/next.config.mjs` 에 `generateBuildId` 고정.
+
+```js
+generateBuildId: async () => 'notedrop-viewer'
+```
+
+검증 결과:
+- 같은 source 두 번 빌드 → 142 file 모두 byte-동일
+- plugin esbuild zipSync → fingerprint `93628297270520436ae186db38c9e6e050cdf778c508615bc65b89b7b6f2dcd4` deterministic
+- viewer source 변경 시 chunk 이름 (content hash) 변경 → buildManifest content 변경 → fingerprint 갱신 정상
+
+이로써 **옵션 A 의 cache hit 가 *plugin 재빌드 간에도* 정상 작동**. viewer
+source 변경 0 인 plugin update 시 cache hit → push 없음. viewer source 변경
+시만 옵션 B 의 sync 명령 의무 (정확).
 
 ### 6.3 변경 감지 filter (v0.1.34+) 가 이미 큰 효과
 

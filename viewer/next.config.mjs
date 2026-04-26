@@ -18,6 +18,15 @@ const config = {
   trailingSlash: true,
   images: { unoptimized: true },
   reactStrictMode: true,
+  // v0.1.46 fix — Next.js 가 매 빌드마다 random buildId 발급하는 default 동작이
+  // viewer.zip 의 fingerprint 변동 원인 (postmortem
+  // 2026-04-27-publish-efficiency-measurement.md §6.2). buildId 고정 →
+  // 같은 viewer source 의 빌드 결과가 byte-deterministic → plugin 의
+  // viewer.fingerprint.txt 도 deterministic → cache hit 정상 작동.
+  //
+  // viewer source 변경 시 chunk 이름 (content hash) 자동 변경 → buildManifest.js
+  // content 변경 → fingerprint 다름. 즉 cache busting 정상.
+  generateBuildId: async () => 'notedrop-viewer',
   experimental: {
     optimizePackageImports: ['katex', 'mermaid']
   }
