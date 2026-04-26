@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { FakeGitClient } from './FakeGitClient.js'
 
-const auth = { username: 'siakun', token: 'ghp_test' }
-const author = { name: 'Sia819', email: 'lunasia819@gmail.com' }
+const auth = { username: 'username', token: 'ghp_test' }
+const author = { name: 'Username', email: 'username@example.com' }
 
 describe('FakeGitClient', () => {
   it('clone records call', async () => {

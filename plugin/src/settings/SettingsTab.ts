@@ -62,12 +62,23 @@ export class NotedropSettingTab extends PluginSettingTab {
           })
       })
 
+    const pagesUrl = deriveShareUrlBase(this.plugin.settings.targetRepo)
+    const targetRepoDesc = createFragment((frag) => {
+      frag.appendText('발행 대상 GitHub 레포 (형식: owner/repo).')
+      if (pagesUrl) {
+        frag.createEl('br')
+        frag.appendText('GH Pages: ')
+        const link = frag.createEl('a', { text: pagesUrl, href: pagesUrl })
+        link.setAttr('target', '_blank')
+        link.setAttr('rel', 'noopener')
+      }
+    })
     new Setting(containerEl)
       .setName('Target repository')
-      .setDesc('발행 대상 GitHub 레포 (형식: owner/repo).')
+      .setDesc(targetRepoDesc)
       .addText((text) =>
         text
-          .setPlaceholder('siakun/notedrop')
+          .setPlaceholder('username/repo')
           .setValue(this.plugin.settings.targetRepo)
           .onChange(async (value) => {
             this.plugin.settings.targetRepo = value.trim()
@@ -109,24 +120,6 @@ export class NotedropSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.publishViewerAssets)
           .onChange(async (value) => {
             this.plugin.settings.publishViewerAssets = value
-            await this.plugin.saveSettings()
-          })
-      )
-
-    const derivedShareBase = deriveShareUrlBase(this.plugin.settings.targetRepo)
-    new Setting(containerEl)
-      .setName('Share URL base (선택)')
-      .setDesc(
-        derivedShareBase
-          ? `비워두면 target repo 기준 자동: ${derivedShareBase}. 커스텀 도메인 (CNAME) 쓸 때만 입력.`
-          : 'target repo 가 정해지면 자동 도출됩니다. 커스텀 도메인이면 직접 입력.'
-      )
-      .addText((text) =>
-        text
-          .setPlaceholder(derivedShareBase || 'https://blog.example.com')
-          .setValue(this.plugin.settings.shareUrlBase)
-          .onChange(async (value) => {
-            this.plugin.settings.shareUrlBase = value.trim().replace(/\/$/, '')
             await this.plugin.saveSettings()
           })
       )

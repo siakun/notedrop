@@ -9,7 +9,6 @@ export type PluginSettings = {
   previewPort: number
   autoStartPreview: boolean
   autoUnpublish: boolean
-  shareUrlBase: string
   publishedSeeds: SeedEntry[]
   unpublishedChanges: boolean
 }
@@ -23,7 +22,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   previewPort: 4321,
   autoStartPreview: false,
   autoUnpublish: false,
-  shareUrlBase: '',
   publishedSeeds: [],
   unpublishedChanges: true
 }
