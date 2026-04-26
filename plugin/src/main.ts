@@ -3,7 +3,7 @@ import { ObsidianVaultFs } from './infrastructure/ObsidianVaultFs.js'
 import { ObsidianMetaCache } from './infrastructure/ObsidianMetaCache.js'
 import { VaultEventBridge } from './infrastructure/VaultEventBridge.js'
 import { PreviewServer } from './infrastructure/PreviewServer.js'
-import { PublishIndex } from './domain/PublishIndex.js'
+import { PublishIndex, type SeedEntry } from './domain/PublishIndex.js'
 import { BookAssembler } from './domain/BookAssembler.js'
 import { ContentResolver } from './domain/ContentResolver.js'
 import { ContentTransformer } from './domain/ContentTransformer.js'
@@ -26,6 +26,9 @@ import {
 } from './commands/previewServer.js'
 import type { PublishedItem } from './domain/types.js'
 
+const SEED_SAVE_DEBOUNCE_MS = 500
+const HASH_HEX_RE = /^[0-9a-f]{32}$/
+
 export default class NotedropPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS
   private vault!: ObsidianVaultFs
@@ -37,6 +40,7 @@ export default class NotedropPlugin extends Plugin {
   private manifestBuilder!: ManifestBuilder
   private orchestrator!: PublishOrchestrator
   private preview!: PreviewServer
+  private seedSaveTimer: ReturnType<typeof setTimeout> | null = null
 
   override async onload(): Promise<void> {
     await this.loadSettings()
@@ -59,6 +63,11 @@ export default class NotedropPlugin extends Plugin {
     this.preview = new PreviewServer(this.orchestrator, this.vault, this.index, {
       port: this.settings.previewPort
     })
+
+    this.index.seed(this.normalizeSeeds(this.settings.publishedSeeds))
+    this.index.on('added', () => this.scheduleSeedSave())
+    this.index.on('changed', () => this.scheduleSeedSave())
+    this.index.on('removed', () => this.scheduleSeedSave())
 
     this.addSettingTab(new NotedropSettingTab(this.app, this))
 
@@ -120,6 +129,7 @@ export default class NotedropPlugin extends Plugin {
       console.log(
         `notedrop: indexed ${this.index.list().length} published note(s)`
       )
+      void this.persistSeedsNow()
       if (this.settings.autoStartPreview) {
         try {
           const status = await this.preview.start()
@@ -136,6 +146,11 @@ export default class NotedropPlugin extends Plugin {
   }
 
   override async onunload(): Promise<void> {
+    if (this.seedSaveTimer) {
+      clearTimeout(this.seedSaveTimer)
+      this.seedSaveTimer = null
+      await this.persistSeedsNow()
+    }
     this.bridge?.stop()
     await this.preview?.stop()
     console.log('notedrop unloaded')
@@ -144,6 +159,9 @@ export default class NotedropPlugin extends Plugin {
   async loadSettings(): Promise<void> {
     const stored = (await this.loadData()) as Partial<PluginSettings> | null
     this.settings = { ...DEFAULT_SETTINGS, ...(stored ?? {}) }
+    if (!Array.isArray(this.settings.publishedSeeds)) {
+      this.settings.publishedSeeds = []
+    }
   }
 
   async saveSettings(): Promise<void> {
@@ -162,4 +180,55 @@ export default class NotedropPlugin extends Plugin {
     if (start) await this.preview.start()
     else await this.preview.stop()
   }
+
+  private normalizeSeeds(seeds: SeedEntry[]): SeedEntry[] {
+    return seeds.map((s) => ({
+      ...s,
+      hash: dashifyHash(s.hash)
+    }))
+  }
+
+  private snapshotSeeds(): SeedEntry[] {
+    return this.index.list().map((it) => ({
+      filePath: it.filePath,
+      hash: it.hash,
+      slug: it.slug,
+      publishedAt: it.publishedAt
+    }))
+  }
+
+  private scheduleSeedSave(): void {
+    if (this.seedSaveTimer) clearTimeout(this.seedSaveTimer)
+    this.seedSaveTimer = setTimeout(() => {
+      this.seedSaveTimer = null
+      void this.persistSeedsNow()
+    }, SEED_SAVE_DEBOUNCE_MS)
+  }
+
+  private async persistSeedsNow(): Promise<void> {
+    const fresh = this.snapshotSeeds()
+    if (seedsEqual(this.settings.publishedSeeds, fresh)) return
+    this.settings.publishedSeeds = fresh
+    await this.saveSettings()
+  }
+}
+
+function dashifyHash(hash: string): string {
+  if (HASH_HEX_RE.test(hash)) {
+    return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20)}`
+  }
+  return hash
+}
+
+function seedsEqual(a: SeedEntry[], b: SeedEntry[]): boolean {
+  if (a.length !== b.length) return false
+  const ai = new Map(a.map((e) => [e.filePath, e]))
+  for (const e of b) {
+    const prev = ai.get(e.filePath)
+    if (!prev) return false
+    if (prev.hash !== e.hash) return false
+    if (prev.slug !== e.slug) return false
+    if (prev.publishedAt !== e.publishedAt) return false
+  }
+  return true
 }
