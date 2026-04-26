@@ -161,6 +161,23 @@ export default class NotedropPlugin extends Plugin {
       })
     }
 
+    // dogfood 명령 — debugMode 시만
+    if (this.settings.debugMode) {
+      const { DOGFOOD_COMMAND_REGISTRY } = await import('./commands/dogfood/registry.js')
+      for (const cmd of DOGFOOD_COMMAND_REGISTRY) {
+        this.addCommand({
+          id: cmd.id,
+          name: cmd.name,
+          callback: () => {
+            void cmd.callback(this.ctx)
+          }
+        })
+      }
+      logger.info('lifecycle', 'dogfood commands registered', {
+        count: DOGFOOD_COMMAND_REGISTRY.length
+      })
+    }
+
     this.app.workspace.onLayoutReady(async () => {
       await index.build({ bookAssembler })
       bridge.start()
