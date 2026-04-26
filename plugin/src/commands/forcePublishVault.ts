@@ -1,6 +1,10 @@
 import { Notice } from 'obsidian'
 import type { PluginSettings } from '../settings/PluginSettings.js'
-import { buildPublishDeps, executePublish, type PublishDeps } from './publishVault.js'
+import {
+  buildPublishDeps,
+  executePublish,
+  type PublishDeps
+} from './publishVault.js'
 import type { CommandDef } from './types.js'
 
 /**
@@ -17,8 +21,8 @@ export async function forcePublishVault(
   deps: PublishDeps,
   settings: PluginSettings
 ): Promise<void> {
-  new Notice('notedrop: Force publish — dirty 체크 우회', 4000)
-  await executePublish(deps, settings)
+  new Notice('notedrop: Force publish — dirty + 변경 감지 모두 우회', 4000)
+  await executePublish({ ...deps, skipChangeDetection: true }, settings)
 }
 
 export const forcePublishVaultCommand: CommandDef = {

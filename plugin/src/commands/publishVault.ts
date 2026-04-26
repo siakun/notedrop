@@ -2,48 +2,41 @@ import { Notice } from 'obsidian'
 import type { App } from 'obsidian'
 import type { VaultFs } from '../ports/VaultFs.js'
 import type { PublishIndex } from '../domain/PublishIndex.js'
-import type { ContentTransformer } from '../domain/ContentTransformer.js'
-import type { ManifestBuilder } from '../domain/ManifestBuilder.js'
 import type { PluginSettings } from '../settings/PluginSettings.js'
-import {
-  PublishOrchestrator,
-  type PublishedFile
-} from '../domain/PublishOrchestrator.js'
 import {
   GitHubPublisher,
   GitHubAuthError,
   GitHubApiError
 } from '../infrastructure/GitHubPublisher.js'
-import { unzipSync } from 'fflate'
-
-import viewerZipB64 from '../embedded/viewer.zip.b64'
+import type { PluginContext } from '../services/PluginContext.js'
+import type { PlanFactory } from '../services/PlanFactory.js'
+import type { DirtyTracker } from '../services/DirtyTracker.js'
 import type { CommandDef } from './types.js'
 
-const TEXT_EXTENSIONS = new Set([
-  'html', 'htm', 'css', 'js', 'mjs', 'json', 'txt', 'md', 'svg', 'xml', 'map'
-])
-
+/**
+ * publish 핵심 의존. main.ts (또는 buildPublishDeps) 가 ctx 에서 추출하여
+ * 주입. domain/infra 인스턴스 직접 노출 없음 — service 만 받음.
+ */
 export type PublishDeps = {
   app: App
   vault: VaultFs
   index: PublishIndex
-  transformer: ContentTransformer
-  manifestBuilder: ManifestBuilder
+  buildPlan: PlanFactory
+  dirtyTracker: DirtyTracker
   onPublishSuccess?: () => Promise<void>
+  /**
+   * true 면 변경 감지 (lastPublishedFiles 비교) 우회 + plan.files 전체
+   * push. forcePublishVault 가 사용. 일반 publishVault 는 false.
+   */
+  skipChangeDetection?: boolean
 }
 
 export type PublishGate = {
-  /**
-   * dirty=true (변경 있음) 면 publish 진행. dirty=false 면 Notice 표시
-   * 후 게이트가 publish 차단. 게이트 자체가 차단 결정 + 사용자 메시지를
-   * 책임진다.
-   */
   isDirty: () => Promise<boolean>
 }
 
 /**
  * smart publish — dirty 게이트 통과 시에만 실제 publish.
- * 발행 버튼 + Cmd+P "Publish vault to GitHub" 명령어가 같은 진입점.
  */
 export async function publishVault(
   deps: PublishDeps,
@@ -71,18 +64,15 @@ export const publishVaultCommand: CommandDef = {
 }
 
 /**
- * commands 가 PluginContext 에서 publish 의존을 추출하는 헬퍼. ctx 의 풀
- * surface 가 아닌 publish 가 필요한 5 개 + onPublishSuccess 콜백만.
+ * commands 가 PluginContext 에서 publish 의존을 추출하는 헬퍼.
  */
-export function buildPublishDeps(
-  ctx: import('../services/PluginContext.js').PluginContext
-): PublishDeps {
+export function buildPublishDeps(ctx: PluginContext): PublishDeps {
   return {
     app: ctx.app,
     vault: ctx.vault,
     index: ctx.index,
-    transformer: ctx.transformer,
-    manifestBuilder: ctx.manifestBuilder,
+    buildPlan: ctx.buildPlan,
+    dirtyTracker: ctx.dirtyTracker,
     onPublishSuccess: async () => {
       const snapshot = await ctx.dirtyTracker.computeSnapshot()
       await ctx.dirtyTracker.confirmPublished(snapshot)
@@ -93,7 +83,7 @@ export function buildPublishDeps(
 /**
  * 핵심 publish 실행. 게이트 없음. forcePublishVault 와 publishVault 양쪽이
  * 공유. 외부 호출자는 publishVault (smart) 또는 forcePublishVault (force)
- * 만 사용. executePublish 는 같은 commands/ 폴더 안에서만 import 의도.
+ * 만 사용.
  */
 export async function executePublish(
   deps: PublishDeps,
@@ -112,23 +102,35 @@ export async function executePublish(
     return
   }
 
-  const orchestrator = new PublishOrchestrator(
-    deps.vault,
-    deps.index,
-    deps.transformer,
-    deps.manifestBuilder,
-    { publicRoot: settings.publicRoot, generatedBy: 'notedrop-plugin' }
-  )
-
   const startNotice = new Notice('notedrop: 발행 준비 중…', 0)
   try {
-    const plan = await orchestrator.plan()
-    if (settings.publishViewerAssets) {
-      const viewerFiles = collectViewerFiles(settings.publicRoot)
-      plan.files.push(...viewerFiles)
+    const plan = await deps.buildPlan()
+    const totalFileCount = plan.files.length
+
+    // 변경 감지: lastPublishedFiles 와 비교해 변경된 path 만 push.
+    // base_tree 가 변경 없는 path 자동 보존이라 blob/tree 등록 회수 절감.
+    // force publish (skipChangeDetection=true) 는 일괄 push.
+    if (!deps.skipChangeDetection) {
+      const diff = await deps.dirtyTracker.computeDiff()
+      if (diff.hasBaseline) {
+        const changedPaths = new Set([...diff.added, ...diff.modified])
+        plan.files = plan.files.filter((f) => changedPaths.has(f.path))
+      }
     }
+
+    if (plan.files.length === 0) {
+      startNotice.hide()
+      new Notice(
+        'notedrop: 변경된 파일 0 — push 안 함 (force publish 면 우회)',
+        5000
+      )
+      return
+    }
+
     startNotice.setMessage(
-      `notedrop: ${plan.files.length} 파일 GitHub 에 push 중…`
+      plan.files.length === totalFileCount
+        ? `notedrop: ${plan.files.length} 파일 GitHub 에 push 중…`
+        : `notedrop: ${plan.files.length}/${totalFileCount} 파일 변경됨, push 중…`
     )
 
     const publisher = new GitHubPublisher({
@@ -148,7 +150,9 @@ export async function executePublish(
       8000
     )
     if (deps.onPublishSuccess) {
-      try { await deps.onPublishSuccess() } catch (cbErr) {
+      try {
+        await deps.onPublishSuccess()
+      } catch (cbErr) {
         console.warn('onPublishSuccess hook 실패', cbErr)
       }
     }
@@ -168,62 +172,6 @@ export async function executePublish(
     }
     console.error('notedrop publish failed', err)
   }
-}
-
-function collectViewerFiles(publicRoot: string): PublishedFile[] {
-  const root = publicRoot.trim().replace(/^\/|\/$/g, '')
-  const prefix = root === '' ? '' : `${root}/`
-  const files: PublishedFile[] = [
-    { kind: 'text', path: `${prefix}.nojekyll`, content: '' }
-  ]
-  const entries = unpackViewerZip(viewerZipB64)
-  if (entries.size === 0) {
-    console.warn('notedrop publishVault: viewer.zip 비어 있음 — viewer 자산 미포함')
-    return files
-  }
-  const decoder = new TextDecoder('utf-8')
-  for (const [path, bytes] of entries) {
-    const ext = path.split('.').pop()?.toLowerCase() ?? ''
-    if (TEXT_EXTENSIONS.has(ext)) {
-      files.push({ kind: 'text', path: `${prefix}${path}`, content: decoder.decode(bytes) })
-    } else {
-      files.push({ kind: 'binary', path: `${prefix}${path}`, content: bytes })
-    }
-  }
-  return files
-}
-
-function unpackViewerZip(b64: string): Map<string, Uint8Array> {
-  const out = new Map<string, Uint8Array>()
-  if (!b64 || !b64.trim()) return out
-  let bytes: Uint8Array
-  try {
-    bytes = base64ToBytes(b64.trim())
-  } catch (err) {
-    console.warn('notedrop publishVault: viewer.zip base64 decode 실패', err)
-    return out
-  }
-  let entries: Record<string, Uint8Array>
-  try {
-    entries = unzipSync(bytes)
-  } catch (err) {
-    console.warn('notedrop publishVault: viewer.zip 압축 해제 실패', err)
-    return out
-  }
-  for (const [path, content] of Object.entries(entries)) {
-    out.set(path, content)
-  }
-  return out
-}
-
-function base64ToBytes(b64: string): Uint8Array {
-  if (typeof Buffer !== 'undefined') {
-    return new Uint8Array(Buffer.from(b64, 'base64'))
-  }
-  const binary = atob(b64)
-  const result = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) result[i] = binary.charCodeAt(i)
-  return result
 }
 
 function hintFor(status: number): string {

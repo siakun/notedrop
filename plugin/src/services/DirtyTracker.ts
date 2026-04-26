@@ -1,9 +1,9 @@
 import crypto from 'node:crypto'
-import type { PublishOrchestrator } from '../domain/PublishOrchestrator.js'
 import type {
   PluginSettings,
   PublishedFileSnapshot
 } from '../settings/PluginSettings.js'
+import type { PlanFactory } from './PlanFactory.js'
 
 export type PlanSnapshot = {
   digest: string
@@ -32,7 +32,8 @@ export type PublishDiff = {
  */
 export class DirtyTracker {
   constructor(
-    private readonly orchestrator: PublishOrchestrator,
+    /** 발행 plan 의 단일 출처 — viewer 자산 포함된 전체 파일 목록 */
+    private readonly buildPlan: PlanFactory,
     private readonly settings: PluginSettings,
     private readonly saveSettings: () => Promise<void>
   ) {}
@@ -73,7 +74,7 @@ export class DirtyTracker {
   }
 
   async computeSnapshot(): Promise<PlanSnapshot> {
-    const plan = await this.orchestrator.plan()
+    const plan = await this.buildPlan()
     const hash = crypto.createHash('sha256')
     const files: Record<string, PublishedFileSnapshot> = {}
     const sorted = [...plan.files].sort((a, b) =>

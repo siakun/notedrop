@@ -17,6 +17,7 @@ import { NotedropSettingTab } from './settings/SettingsTab.js'
 import { COMMAND_REGISTRY } from './commands/registry.js'
 import { DirtyTracker } from './services/DirtyTracker.js'
 import { SeedPersistence } from './services/SeedPersistence.js'
+import { createPlanFactory } from './services/PlanFactory.js'
 import type { PluginContext } from './services/PluginContext.js'
 
 /**
@@ -58,7 +59,8 @@ export default class NotedropPlugin extends Plugin {
     })
 
     const saveSettings = (): Promise<void> => this.saveSettings()
-    const dirtyTracker = new DirtyTracker(orchestrator, this.settings, saveSettings)
+    const buildPlan = createPlanFactory(orchestrator, this.settings)
+    const dirtyTracker = new DirtyTracker(buildPlan, this.settings, saveSettings)
     this.seedPersistence = new SeedPersistence(
       index,
       this.settings,
@@ -79,6 +81,7 @@ export default class NotedropPlugin extends Plugin {
       preview,
       settings: this.settings,
       saveSettings,
+      buildPlan,
       dirtyTracker,
       seedPersistence: this.seedPersistence
     }

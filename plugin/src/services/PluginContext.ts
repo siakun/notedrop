@@ -11,6 +11,7 @@ import type { PublishOrchestrator } from '../domain/PublishOrchestrator.js'
 import type { PluginSettings } from '../settings/PluginSettings.js'
 import type { DirtyTracker } from './DirtyTracker.js'
 import type { SeedPersistence } from './SeedPersistence.js'
+import type { PlanFactory } from './PlanFactory.js'
 
 /**
  * 의존 컨테이너 (DI Context). main.ts (Plugin entry) 가 build 후 commands/ +
@@ -33,6 +34,8 @@ export type PluginContext = {
   preview: PreviewServer
   settings: PluginSettings
   saveSettings: () => Promise<void>
+  /** viewer 자산 path 재작성 + manifest/content 합친 단일 plan 출처 */
+  buildPlan: PlanFactory
   dirtyTracker: DirtyTracker
   seedPersistence: SeedPersistence
 }

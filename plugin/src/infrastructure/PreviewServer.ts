@@ -254,7 +254,7 @@ export class PreviewServer {
   }
 }
 
-const BASE_PATHS = ['/notedrop']
+const BASE_PATHS = ['/__NOTEDROP_BASE__', '/notedrop']
 
 function stripBasePath(pathname: string): string {
   for (const base of BASE_PATHS) {
