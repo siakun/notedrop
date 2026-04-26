@@ -23,7 +23,7 @@ describe('GitHubPublisher', () => {
   beforeEach(() => {
     originalFetch = globalThis.fetch
     publisher = new GitHubPublisher({
-      repo: 'siakun/notedrop',
+      repo: 'username/notedrop',
       branch: 'main',
       token: 'test-token'
     })
@@ -77,7 +77,7 @@ describe('GitHubPublisher', () => {
     expect(outcome.commitSha).toBe('new-commit')
     expect(outcome.changedFiles).toBe(2)
     expect(outcome.initialized).toBe(false)
-    expect(outcome.url).toContain('siakun/notedrop')
+    expect(outcome.url).toContain('username/notedrop')
     expect(calls.find((c) => c.url.endsWith('/trees'))?.body).toMatchObject({
       base_tree: 'parent-tree',
       tree: expect.arrayContaining([

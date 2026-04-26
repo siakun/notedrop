@@ -15,7 +15,5 @@ export function deriveShareUrlBase(targetRepo: string): string {
 }
 
 export function resolveShareUrlBase(settings: PluginSettings): string {
-  const explicit = settings.shareUrlBase.trim().replace(/\/$/, '')
-  if (explicit) return explicit
   return deriveShareUrlBase(settings.targetRepo)
 }

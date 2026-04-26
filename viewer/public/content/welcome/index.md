@@ -22,9 +22,7 @@ updatedAt: 2026-04-26T00:00:00.000Z
 ## 빠른 시작
 
 1. Obsidian 에서 BRAT 으로 notedrop 설치
-2. Settings → Notedrop 탭에서 GitHub PAT, target repo, share URL base 설정
+2. Settings → Notedrop 탭에서 GitHub PAT, target repo 설정
 3. 발행할 노트의 frontmatter 에 `notedrop-publish: true`
-4. Command palette → `Notedrop: Publish vault to GitHub`
+4. Settings → Notedrop → Publish 버튼 또는 Command palette → `Notedrop: Publish vault to GitHub`
 5. GH Actions deploy 가 1~2분 안에 정적 뷰어를 갱신
-
-자세한 설명은 [README](https://github.com/siakun/notedrop) 참고.
