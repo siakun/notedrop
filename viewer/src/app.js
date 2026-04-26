@@ -64,11 +64,27 @@ async function init() {
 const VS_KEY = 'notedrop:viewSettings'
 const VS_DEFAULTS = {
   theme: 'night',
+  layout: 'default',
+  pageSize: 'A4',
+  marginTop: 20,
+  marginBottom: 20,
+  marginLeft: 25,
+  marginRight: 25,
   font: 'system',
   fontScale: 1,
   lineScale: 1,
   align: 'left'
 }
+
+const PAGE_DIMS = {
+  B4: { w: 257, h: 364 },
+  A4: { w: 210, h: 297 },
+  B5: { w: 182, h: 257 },
+  A5: { w: 148, h: 210 }
+}
+
+const MARGIN_MIN = 0
+const MARGIN_MAX = 60
 
 const FONT_STACKS = {
   system: 'inherit',
@@ -103,11 +119,19 @@ function saveViewSettings(s) {
 
 function applyViewSettings(s) {
   document.documentElement.dataset.theme = s.theme
+  document.body.dataset.layout = s.layout
   const root = document.documentElement.style
   root.setProperty('--user-font-stack', FONT_STACKS[s.font] ?? 'inherit')
   root.setProperty('--user-font-scale', String(s.fontScale))
   root.setProperty('--user-line-scale', String(s.lineScale))
   root.setProperty('--user-text-align', s.align)
+  const dims = PAGE_DIMS[s.pageSize] ?? PAGE_DIMS.A4
+  root.setProperty('--page-width', `${dims.w}mm`)
+  root.setProperty('--page-height', `${dims.h}mm`)
+  root.setProperty('--page-margin-top', `${s.marginTop}mm`)
+  root.setProperty('--page-margin-bottom', `${s.marginBottom}mm`)
+  root.setProperty('--page-margin-left', `${s.marginLeft}mm`)
+  root.setProperty('--page-margin-right', `${s.marginRight}mm`)
 }
 
 function setupViewSettings() {
@@ -143,6 +167,37 @@ function setupViewSettings() {
     })
   }
 
+  for (const layoutBtn of panel.querySelectorAll('[data-layout-value]')) {
+    layoutBtn.addEventListener('click', () => {
+      settings.layout = layoutBtn.dataset.layoutValue
+      apply()
+    })
+  }
+
+  for (const sizeBtn of panel.querySelectorAll('[data-page-size-value]')) {
+    sizeBtn.addEventListener('click', () => {
+      settings.pageSize = sizeBtn.dataset.pageSizeValue
+      apply()
+    })
+  }
+
+  const marginInputs = {
+    top: panel.querySelector('#vs-margin-top'),
+    bottom: panel.querySelector('#vs-margin-bottom'),
+    left: panel.querySelector('#vs-margin-left'),
+    right: panel.querySelector('#vs-margin-right')
+  }
+  const marginKeys = { top: 'marginTop', bottom: 'marginBottom', left: 'marginLeft', right: 'marginRight' }
+  for (const [side, input] of Object.entries(marginInputs)) {
+    input.addEventListener('input', () => {
+      const n = clamp(Number.parseInt(input.value, 10), MARGIN_MIN, MARGIN_MAX)
+      if (Number.isFinite(n)) {
+        settings[marginKeys[side]] = n
+        apply()
+      }
+    })
+  }
+
   const fontSelect = panel.querySelector('#vs-font')
   fontSelect.addEventListener('change', () => {
     settings.font = fontSelect.value
@@ -171,12 +226,23 @@ function setupViewSettings() {
     saveViewSettings(settings)
     applyViewSettings(settings)
     refreshUi()
+    requestAnimationFrame(updatePageIndicator)
   }
 
   function refreshUi() {
     for (const themeBtn of panel.querySelectorAll('[data-theme-value]')) {
       themeBtn.setAttribute('aria-checked', String(themeBtn.dataset.themeValue === settings.theme))
     }
+    for (const layoutBtn of panel.querySelectorAll('[data-layout-value]')) {
+      layoutBtn.setAttribute('aria-checked', String(layoutBtn.dataset.layoutValue === settings.layout))
+    }
+    for (const sizeBtn of panel.querySelectorAll('[data-page-size-value]')) {
+      sizeBtn.setAttribute('aria-checked', String(sizeBtn.dataset.pageSizeValue === settings.pageSize))
+    }
+    marginInputs.top.value = String(settings.marginTop)
+    marginInputs.bottom.value = String(settings.marginBottom)
+    marginInputs.left.value = String(settings.marginLeft)
+    marginInputs.right.value = String(settings.marginRight)
     fontSelect.value = settings.font
     panel.querySelector('#vs-font-pct').textContent = `${Math.round(settings.fontScale * 100)}%`
     panel.querySelector('#vs-line-pct').textContent = `${Math.round(settings.lineScale * 100)}%`
@@ -190,6 +256,95 @@ function setupViewSettings() {
 
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)) }
 function round1(n) { return Math.round(n * 10) / 10 }
+
+/* ─── Page indicator (horizontal/two-pages) ─────────────────────────── */
+
+let pageIndicatorScrollTarget = null
+let pageIndicatorScrollHandler = null
+
+function setupPageIndicatorListeners() {
+  window.addEventListener('resize', () => requestAnimationFrame(updatePageIndicator))
+}
+
+function updatePageIndicator() {
+  const indicator = document.getElementById('page-indicator')
+  if (!indicator) return
+  const layout = document.body.dataset.layout
+  const isHorizontal = layout === 'horizontal' || layout === 'two-pages'
+  if (!isHorizontal) {
+    indicator.hidden = true
+    detachScrollListener()
+    return
+  }
+  const content = document.querySelector('.entry-content')
+  if (!content) {
+    indicator.hidden = true
+    detachScrollListener()
+    return
+  }
+  const scrollEl = findScrollEl(content)
+  if (!scrollEl) {
+    indicator.hidden = true
+    detachScrollListener()
+    return
+  }
+  attachScrollListener(scrollEl)
+
+  const cs = getComputedStyle(content)
+  const colWidth = parseFloat(cs.columnWidth)
+  const colGap = parseFloat(cs.columnGap) || 0
+  const padLeft = parseFloat(cs.paddingLeft) || 0
+  const padRight = parseFloat(cs.paddingRight) || 0
+  if (!colWidth || !isFinite(colWidth)) {
+    indicator.hidden = true
+    return
+  }
+  const unit = colWidth + colGap
+  const innerScrollWidth = Math.max(0, content.scrollWidth - padLeft - padRight)
+  const total = Math.max(1, Math.round((innerScrollWidth + colGap) / unit))
+  const scrollLeft = scrollEl.scrollLeft
+  const currentRaw = Math.floor(scrollLeft / unit) + 1
+  const current = clamp(currentRaw, 1, total)
+
+  const elCurrent = indicator.querySelector('#page-current')
+  const elTotal = indicator.querySelector('#page-total')
+  if (layout === 'two-pages') {
+    const pairStart = Math.min(Math.floor((current - 1) / 2) * 2 + 1, total)
+    const pairEnd = Math.min(pairStart + 1, total)
+    elCurrent.textContent = pairStart === pairEnd ? `${pairStart}` : `${pairStart}–${pairEnd}`
+  } else {
+    elCurrent.textContent = String(current)
+  }
+  elTotal.textContent = String(total)
+  indicator.hidden = false
+}
+
+function findScrollEl(content) {
+  let el = content.parentElement
+  while (el && el !== document.body) {
+    const cs = getComputedStyle(el)
+    const ox = cs.overflowX
+    if (ox === 'auto' || ox === 'scroll') return el
+    el = el.parentElement
+  }
+  return null
+}
+
+function attachScrollListener(el) {
+  if (pageIndicatorScrollTarget === el) return
+  detachScrollListener()
+  pageIndicatorScrollTarget = el
+  pageIndicatorScrollHandler = () => requestAnimationFrame(updatePageIndicator)
+  el.addEventListener('scroll', pageIndicatorScrollHandler, { passive: true })
+}
+
+function detachScrollListener() {
+  if (pageIndicatorScrollTarget && pageIndicatorScrollHandler) {
+    pageIndicatorScrollTarget.removeEventListener('scroll', pageIndicatorScrollHandler)
+  }
+  pageIndicatorScrollTarget = null
+  pageIndicatorScrollHandler = null
+}
 
 function isPreviewHost() {
   const h = location.hostname
@@ -268,9 +423,12 @@ async function loadManifest() {
 async function render() {
   resetCustomCss()
   const route = parseRoute()
-  if (route.kind === 'home') return renderHome()
-  if (route.kind === 'entry') return renderEntry(route.hash, route.chapter)
-  showError(new Error('알 수 없는 경로'))
+  let result
+  if (route.kind === 'home') result = renderHome()
+  else if (route.kind === 'entry') result = renderEntry(route.hash, route.chapter)
+  else { showError(new Error('알 수 없는 경로')); return }
+  await Promise.resolve(result)
+  requestAnimationFrame(updatePageIndicator)
 }
 
 function parseRoute() {
@@ -456,5 +614,6 @@ function escape(s) {
 
 // Boot — run AFTER all const/function declarations so View Settings consts are initialized
 setupViewSettings()
+setupPageIndicatorListeners()
 window.addEventListener('hashchange', render)
 init().catch((err) => showError(err))
