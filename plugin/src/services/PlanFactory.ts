@@ -59,6 +59,19 @@ export function createPlanFactory(
   }
 }
 
+/**
+ * viewer.zip 안의 *bootstrap 자산* — Next.js 빌드가 viewer/public/* 을 out/*
+ * 으로 그대로 복사하면서 함께 들어가는 manifest.json + content/welcome/* 등.
+ * publish 가 *실제* manifest + content 를 push 하므로 viewer 자산에서 제외.
+ *
+ * 미제외 시 GitHub Tree API 의 last-write-wins 동작 → bootstrap manifest 가
+ * 사용자 manifest 를 덮어씀 → share repo root manifest 영구히 welcome 만 표시.
+ * (v0.1.40 fix 의 근본 원인)
+ */
+function isBootstrapAsset(path: string): boolean {
+  return path === 'manifest.json' || path.startsWith('content/')
+}
+
 export function collectViewerFiles(
   publicRoot: string,
   repoSegment: string
@@ -81,6 +94,7 @@ export function collectViewerFiles(
   // 자체를 제거.
   const replacement = repoSegment ? `/${repoSegment}` : ''
   for (const [path, bytes] of entries) {
+    if (isBootstrapAsset(path)) continue
     const ext = path.split('.').pop()?.toLowerCase() ?? ''
     if (TEXT_EXTENSIONS.has(ext)) {
       const original = decoder.decode(bytes)
