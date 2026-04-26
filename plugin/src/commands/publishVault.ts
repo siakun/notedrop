@@ -120,8 +120,18 @@ export async function executePublish(
         )
       } else {
         const changedPaths = new Set([...diff.added, ...diff.modified])
-        plan.files = plan.files.filter((f) => changedPaths.has(f.path))
-        pushReason = `변경 감지 (added ${diff.added.length}, modified ${diff.modified.length}, removed ${diff.removed.length})`
+        // Meta 파일 (manifest.json, .nojekyll) 은 항상 push.
+        // 사유: dirtyTracker 는 plugin 내부 record 를 비교하지 share repo
+        // 의 실제 상태를 모름. 어느 시점에 publish 가 fail 했지만 baseline
+        // 에는 등록된 케이스 — manifest 가 plugin 과 share repo 사이 mismatch
+        // 인데도 변경 감지가 "변경 없음" 으로 분류 → 영구히 안 push 되는 버그.
+        // manifest 는 ~수 KB 라 매번 push 부담 없음.
+        const isAlwaysPush = (path: string) =>
+          path.endsWith('manifest.json') || path.endsWith('.nojekyll')
+        plan.files = plan.files.filter(
+          (f) => changedPaths.has(f.path) || isAlwaysPush(f.path)
+        )
+        pushReason = `변경 감지 (added ${diff.added.length}, modified ${diff.modified.length}, removed ${diff.removed.length}, +meta)`
         console.log(
           `notedrop publish: ${pushReason}. files=${plan.files.length}/${totalFileCount}`
         )
