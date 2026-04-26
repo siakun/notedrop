@@ -51,11 +51,18 @@
       ├── settings/     PluginSettings, SettingsTab, shareUrl
       ├── commands/     share/unshare/openList/copyUrl/publishVault/previewServer
       └── testing/      InMemory*, Fake*
-/viewer/                vanilla SPA + esbuild
-  └── src/              index.html + app.js + style.css
-/docs/                  arc42 13 + ADR 27
+/viewer/                Next.js Static SPA + React + TypeScript + unified.js
+  └── src/
+      ├── app/          App Router (layout, page, [hash]/page)
+      ├── components/   markdown/, viewer/, common/, providers/
+      ├── lib/          manifestClient, contentClient, cssInjector, paginationConfig
+      ├── hooks/        useManifest, useContent, usePageSize
+      ├── markdown-pipeline/  unified + remark plugin (callout, highlight, mermaid)
+      └── types/        manifest, content, pagedjs.d.ts
+/docs/                  arc42 13 + ADR 28
 /.github/workflows/
-  └── release.yml       tag push → plugin build (viewer 자산 인라인 포함) → GH release
+  ├── release.yml       tag push → plugin build (viewer 자산 zip 인라인) → GH release
+  └── deploy.yml        viewer/** 변경 → next build → GH Pages 자동 배포
 ```
 
 자세한 설계는 [docs/](./docs/) 의 arc42 + ADR 참고.
@@ -95,11 +102,17 @@
 - 옵시디언 위키링크 `[[Note]]`, `[[Note|alt]]`
 - 옵시디언 임베드 `![[Note]]` (깊이 1, [ADR-0009](docs/decisions/0009-미발행-ref-안전장치.md))
 - 이미지 `![[image.png]]` (png/jpg/svg/webp/gif), 사이즈 `![[img.png|400]]`
-- 콜아웃 `> [!note]`, `> [!warning]` 등
+- 콜아웃 `> [!note]`, `> [!warning]`, `> [!info]` 등 (옵시디언 코어 13 variant + 25 alias 정규화)
 - 하이라이트 `==text==`
+- 수식 `$inline$`, `$$block$$` (KaTeX)
+- Mermaid 다이어그램 (` ```mermaid ` 블록, 클라이언트 렌더)
+- 풋노트 `[^1]`, 블록 ID `^id`, 태스크 `- [ ]`
 - 미발행 ref 자동 dead-link 처리 (안전장치)
+- 페이지 사이즈 5종 (A3/A4/A5/B5/B6) + paged.js 페이지네이션 + PDF 다운로드
+- 페이지별 customCss 격리 주입
+- 라이브 리로드 (preview server SSE)
 
-v2 deferred: KaTeX 수식, Mermaid, 검색, paged.js 페이지네이션, Excalidraw embed, 다크 테마, 커스텀 도메인. 자세한 계획은 [11-mvp-and-roadmap.md](docs/11-mvp-and-roadmap.md) §11.2.
+v2 deferred: 검색 (Lunr.js), Excalidraw embed, 다크 테마, 커스텀 도메인, 변경 감지 publish (manifest diff). 자세한 계획은 [11-mvp-and-roadmap.md](docs/11-mvp-and-roadmap.md) §11.2.
 
 ## 개발
 
@@ -119,9 +132,12 @@ npm run dev         # esbuild watch
 ```bash
 cd viewer
 npm install
-npm run build       # esbuild + static copy → dist/
-npm run dev         # esbuild watch + dev server (http://127.0.0.1:4321)
+npm run typecheck
+npm run build       # next build → out/ (Next.js export)
+npm run dev         # next dev (http://localhost:3000)
 ```
+
+뷰어 자산은 plugin 빌드 시 `viewer/out/` 의 모든 파일이 zip 으로 묶여 `plugin/src/embedded/viewer.zip.b64` 로 인라인 됩니다. plugin 의 PreviewServer 가 시작 시 이 zip 을 메모리에 풀어 정적 자산으로 서빙. 따라서 plugin 빌드 직전에 viewer 빌드가 선행되어야 새 viewer 가 인라인 됩니다.
 
 ### Release
 
@@ -138,18 +154,19 @@ git push origin main 0.1.9
 - [x] **M1** Domain layer (의존 없음 도메인 6 + ports + fakes)
 - [x] **M2** Adapters + EventBridge + BRAT 알파 (`0.0.1`)
 - [x] **M3** Publishing pipeline + GitHub Tree API
-- [x] **M4** Vanilla SPA viewer
+- [x] **M4** Viewer = Next.js + React + TypeScript + unified.js (spec §5.2 표준 복귀, ADR-0011/0012)
 - [x] **M5** Polish + Preview server (SSE 라이브 리로드)
 - [ ] **M6** dogfood + community plugins 마켓 등재 (v1.0 안정화)
 
 ## v2 백로그
 
 [docs/11-mvp-and-roadmap.md §11.2](docs/11-mvp-and-roadmap.md) 참고. 핵심:
-- paged.js 책 페이지네이션 + PDF print
-- KaTeX/Mermaid 통합
-- 검색 (Lunr.js)
+- 검색 (Lunr.js 클라이언트 인덱스 + 결과 UI)
+- Excalidraw embed
+- 다크 테마
 - 변경 감지 publish (이전 manifest 비교 → blob 호출 skip)
 - 커스텀 도메인 (CNAME) 지원
+- 챕터별 lazy 페이지네이션 (큰 책 paged.js 성능)
 
 ## 라이선스
 
