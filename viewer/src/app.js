@@ -59,6 +59,69 @@ init().catch((err) => showError(err))
 async function init() {
   await loadManifest()
   await render()
+  if (isPreviewHost()) connectLiveReload()
+}
+
+function isPreviewHost() {
+  const h = location.hostname
+  return h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0'
+}
+
+function connectLiveReload() {
+  let backoff = 500
+  const open = () => {
+    const es = new EventSource('events')
+    es.addEventListener('hello', () => {
+      backoff = 500
+      showLiveBadge('connected')
+    })
+    const reload = async () => {
+      try {
+        await loadManifest()
+        await render()
+        flashLiveBadge()
+      } catch (err) {
+        console.warn('notedrop live reload 실패', err)
+      }
+    }
+    es.addEventListener('added', reload)
+    es.addEventListener('changed', reload)
+    es.addEventListener('removed', reload)
+    es.onerror = () => {
+      es.close()
+      showLiveBadge('reconnecting')
+      setTimeout(open, backoff)
+      backoff = Math.min(backoff * 2, 5000)
+    }
+  }
+  open()
+}
+
+function showLiveBadge(state) {
+  let el = document.getElementById('live-badge')
+  if (!el) {
+    el = document.createElement('div')
+    el.id = 'live-badge'
+    el.style.cssText = 'position:fixed;right:12px;bottom:12px;padding:0.3rem 0.6rem;border-radius:999px;font:600 11px/1 -apple-system,BlinkMacSystemFont,sans-serif;color:white;z-index:1000;letter-spacing:0.05em;text-transform:uppercase;transition:opacity 0.3s,background 0.3s;'
+    document.body.appendChild(el)
+  }
+  if (state === 'connected') {
+    el.textContent = 'LIVE'
+    el.style.background = '#16a34a'
+    el.style.opacity = '0.8'
+  } else if (state === 'reconnecting') {
+    el.textContent = 'reconnecting…'
+    el.style.background = '#a16207'
+    el.style.opacity = '0.85'
+  }
+}
+
+function flashLiveBadge() {
+  const el = document.getElementById('live-badge')
+  if (!el) return
+  el.style.background = '#0ea5e9'
+  el.textContent = 'updated'
+  setTimeout(() => showLiveBadge('connected'), 800)
 }
 
 async function loadManifest() {

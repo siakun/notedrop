@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { VaultFs } from '../ports/VaultFs.js'
 import type { PublishOrchestrator } from '../domain/PublishOrchestrator.js'
+import type { PublishIndex } from '../domain/PublishIndex.js'
 
 import indexHtml from '../embedded/index.html'
 import appJs from '../embedded/app.js.txt'
@@ -17,13 +18,19 @@ export type PreviewServerStatus =
   | { state: 'stopped' }
   | { state: 'running'; url: string }
 
+type SsePayload = { event: 'added' | 'changed' | 'removed'; hash: string }
+
 export class PreviewServer {
   private server: http.Server | null = null
   private status: PreviewServerStatus = { state: 'stopped' }
+  private subscribers = new Set<ServerResponse>()
+  private indexUnsubs: Array<() => void> = []
+  private keepAlive: ReturnType<typeof setInterval> | null = null
 
   constructor(
     private orchestrator: PublishOrchestrator,
     private vault: VaultFs,
+    private index: PublishIndex,
     private options: PreviewServerOptions = {}
   ) {}
 
@@ -67,11 +74,29 @@ export class PreviewServer {
     this.server = server
     const addr = server.address() as AddressInfo
     this.status = { state: 'running', url: `http://${host}:${addr.port}` }
+
+    this.subscribeIndex()
+    this.startKeepAlive()
+
     return this.status
   }
 
   async stop(): Promise<void> {
     if (!this.server) return
+
+    for (const unsub of this.indexUnsubs) unsub()
+    this.indexUnsubs = []
+
+    if (this.keepAlive) {
+      clearInterval(this.keepAlive)
+      this.keepAlive = null
+    }
+
+    for (const res of this.subscribers) {
+      try { res.end() } catch {}
+    }
+    this.subscribers.clear()
+
     await new Promise<void>((resolve) => {
       this.server!.close(() => resolve())
     })
@@ -79,9 +104,36 @@ export class PreviewServer {
     this.status = { state: 'stopped' }
   }
 
+  private subscribeIndex(): void {
+    const events: SsePayload['event'][] = ['added', 'changed', 'removed']
+    for (const ev of events) {
+      const unsub = this.index.on(ev, (hash) => {
+        this.broadcast({ event: ev, hash })
+      })
+      this.indexUnsubs.push(unsub)
+    }
+  }
+
+  private startKeepAlive(): void {
+    this.keepAlive = setInterval(() => {
+      for (const res of this.subscribers) {
+        try { res.write(': ping\n\n') } catch {}
+      }
+    }, 25000)
+  }
+
+  private broadcast(payload: SsePayload): void {
+    const data = `event: ${payload.event}\ndata: ${JSON.stringify({ hash: payload.hash })}\n\n`
+    for (const res of this.subscribers) {
+      try { res.write(data) } catch {}
+    }
+  }
+
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', 'http://localhost')
-    let pathname = decodeURIComponent(url.pathname)
+    const pathname = decodeURIComponent(url.pathname)
+
+    if (pathname === '/events') return this.handleEvents(req, res)
 
     if (pathname === '/' || pathname === '/index.html') {
       return send(res, 200, 'text/html; charset=utf-8', indexHtml)
@@ -140,6 +192,25 @@ export class PreviewServer {
     }
 
     send(res, 404, 'text/plain; charset=utf-8', `not found: ${pathname}`)
+  }
+
+  private handleEvents(req: IncomingMessage, res: ServerResponse): void {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    })
+    res.write('retry: 3000\n\n')
+    res.write('event: hello\ndata: {}\n\n')
+
+    this.subscribers.add(res)
+
+    const cleanup = (): void => {
+      this.subscribers.delete(res)
+    }
+    req.on('close', cleanup)
+    req.on('error', cleanup)
   }
 }
 
