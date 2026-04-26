@@ -3,6 +3,7 @@ import type { App } from 'obsidian'
 import type NotedropPlugin from '../main.js'
 import { deriveShareUrlBase } from './shareUrl.js'
 import { showPublishDiff } from '../commands/showPublishDiff.js'
+import { publishVault } from '../commands/publishVault.js'
 
 export class NotedropSettingTab extends PluginSettingTab {
   private revalidating = false
@@ -81,7 +82,9 @@ export class NotedropSettingTab extends PluginSettingTab {
           btn.setDisabled(true)
           btn.setButtonText('발행 중…')
           try {
-            await this.plugin.runPublish()
+            await publishVault(this.plugin.buildPublishDeps(), this.plugin.settings, {
+              isDirty: () => this.plugin.revalidateDirty()
+            })
           } finally {
             this.display()
           }

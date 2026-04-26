@@ -31,7 +31,41 @@ export type PublishDeps = {
   onPublishSuccess?: () => Promise<void>
 }
 
+export type PublishGate = {
+  /**
+   * dirty=true (변경 있음) 면 publish 진행. dirty=false 면 Notice 표시
+   * 후 게이트가 publish 차단. 게이트 자체가 차단 결정 + 사용자 메시지를
+   * 책임진다.
+   */
+  isDirty: () => Promise<boolean>
+}
+
+/**
+ * smart publish — dirty 게이트 통과 시에만 실제 publish.
+ * 발행 버튼 + Cmd+P "Publish vault to GitHub" 명령어가 같은 진입점.
+ */
 export async function publishVault(
+  deps: PublishDeps,
+  settings: PluginSettings,
+  gate: PublishGate
+): Promise<void> {
+  const dirty = await gate.isDirty()
+  if (!dirty) {
+    new Notice(
+      'notedrop: 변경 사항이 없습니다 — 발행 안 함 (강제 발행은 Force publish 명령어)',
+      5000
+    )
+    return
+  }
+  await executePublish(deps, settings)
+}
+
+/**
+ * 핵심 publish 실행. 게이트 없음. forcePublishVault 와 publishVault 양쪽이
+ * 공유. 외부 호출자는 publishVault (smart) 또는 forcePublishVault (force)
+ * 만 사용. executePublish 는 같은 commands/ 폴더 안에서만 import 의도.
+ */
+export async function executePublish(
   deps: PublishDeps,
   settings: PluginSettings
 ): Promise<void> {

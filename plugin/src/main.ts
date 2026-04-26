@@ -1,5 +1,5 @@
 import crypto from 'node:crypto'
-import { Notice, Plugin } from 'obsidian'
+import { Plugin } from 'obsidian'
 import { ObsidianVaultFs } from './infrastructure/ObsidianVaultFs.js'
 import { ObsidianMetaCache } from './infrastructure/ObsidianMetaCache.js'
 import { VaultEventBridge } from './infrastructure/VaultEventBridge.js'
@@ -20,7 +20,8 @@ import { shareNote } from './commands/shareNote.js'
 import { unshareNote } from './commands/unshareNote.js'
 import { openSharedList } from './commands/openSharedList.js'
 import { copyShareUrl } from './commands/copyShareUrl.js'
-import { publishVault } from './commands/publishVault.js'
+import { publishVault, type PublishDeps } from './commands/publishVault.js'
+import { forcePublishVault } from './commands/forcePublishVault.js'
 import {
   startPreviewServer,
   stopPreviewServer,
@@ -96,12 +97,18 @@ export default class NotedropPlugin extends Plugin {
     this.addCommand({
       id: 'publish-vault',
       name: 'Publish vault to GitHub',
-      callback: () => { void this.runPublish() }
+      callback: () => {
+        void publishVault(this.buildPublishDeps(), this.settings, {
+          isDirty: () => this.revalidateDirty()
+        })
+      }
     })
     this.addCommand({
       id: 'force-publish-vault',
       name: 'Force publish vault to GitHub (변경 없어도 강제)',
-      callback: () => { void this.runPublish({ force: true }) }
+      callback: () => {
+        void forcePublishVault(this.buildPublishDeps(), this.settings)
+      }
     })
     this.addCommand({
       id: 'start-preview',
@@ -181,38 +188,25 @@ export default class NotedropPlugin extends Plugin {
     return this.settings.unpublishedChanges
   }
 
-  async runPublish(options: { force?: boolean } = {}): Promise<void> {
-    if (!options.force) {
-      // dogfood lesson: 발행 버튼은 dirty=false 일 때 비활성, 그러나 명령어
-      // (Cmd+P → Publish) 는 항상 실행되었음. 둘은 동일 게이트로 통과해야
-      // 사용자 멘탈 모델 일치. force 옵션은 명시적 강제 publish 명령어 (v2)
-      // 또는 share repo 의 stale 자산 정리 같은 특수 케이스 진입점.
-      const dirty = await this.revalidateDirty()
-      if (!dirty) {
-        new Notice(
-          'notedrop: 변경 사항이 없습니다 — 발행 안 함 (강제 발행은 Force publish 명령어)',
-          5000
-        )
-        return
+  /**
+   * publish 명령어들의 공통 의존 번들. 명령어 자체 (smart vs force) 는
+   * commands/ 안에 캡슐화됨. main.ts 는 dispatcher + 의존 와이어업만.
+   */
+  buildPublishDeps(): PublishDeps {
+    return {
+      app: this.app,
+      vault: this.vault,
+      index: this.index,
+      transformer: this.transformer,
+      manifestBuilder: this.manifestBuilder,
+      onPublishSuccess: async () => {
+        const snapshot = await this.computePlanSnapshot()
+        this.settings.lastPublishedDigest = snapshot.digest
+        this.settings.lastPublishedFiles = snapshot.files
+        this.settings.unpublishedChanges = false
+        await this.saveSettings()
       }
     }
-    await publishVault(
-      {
-        app: this.app,
-        vault: this.vault,
-        index: this.index,
-        transformer: this.transformer,
-        manifestBuilder: this.manifestBuilder,
-        onPublishSuccess: async () => {
-          const snapshot = await this.computePlanSnapshot()
-          this.settings.lastPublishedDigest = snapshot.digest
-          this.settings.lastPublishedFiles = snapshot.files
-          this.settings.unpublishedChanges = false
-          await this.saveSettings()
-        }
-      },
-      this.settings
-    )
   }
 
   async revalidateDirty(): Promise<boolean> {
