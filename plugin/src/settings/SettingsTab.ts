@@ -110,6 +110,43 @@ export class NotedropSettingTab extends PluginSettingTab {
           })
       )
 
+    const previewStatus = this.plugin.previewStatus()
+    const isRunning = previewStatus.state === 'running'
+    new Setting(containerEl)
+      .setName('Preview server')
+      .setDesc(
+        isRunning
+          ? `실행 중 — ${previewStatus.url}`
+          : '중지됨. 시작하면 로컬 라이브 프리뷰가 활성화됩니다.'
+      )
+      .addButton((btn) => {
+        if (isRunning) {
+          btn
+            .setButtonText('중지')
+            .setWarning()
+            .onClick(async () => {
+              try {
+                await this.plugin.togglePreview(false)
+              } catch (err) {
+                console.error('preview stop 실패', err)
+              }
+              this.display()
+            })
+        } else {
+          btn
+            .setButtonText('시작')
+            .setCta()
+            .onClick(async () => {
+              try {
+                await this.plugin.togglePreview(true)
+              } catch (err) {
+                console.error('preview start 실패', err)
+              }
+              this.display()
+            })
+        }
+      })
+
     new Setting(containerEl)
       .setName('Auto start preview')
       .setDesc('Obsidian 시작 시 프리뷰 서버 자동 시작.')
