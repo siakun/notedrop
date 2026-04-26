@@ -556,53 +556,71 @@ body[data-layout="vertical"] .app-shell.book {
   grid-template-columns: 240px var(--page-width);
 }
 
-/* Horizontal / Two Pages = horizontal scroll within a viewport-sized shell */
+/* Horizontal / Two Pages = paged horizontal scroll, fixed page-height */
 body[data-layout="horizontal"] .app-shell,
 body[data-layout="two-pages"] .app-shell {
   max-width: none;
   margin: 0;
   padding: 1.5rem;
-  height: calc(100vh - var(--header-height));
+  height: calc(var(--page-height) + 3rem);
+  min-height: calc(100vh - var(--header-height));
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible;
+  scrollbar-gutter: stable;
 }
 
 body[data-layout="horizontal"] .app-shell.book,
 body[data-layout="two-pages"] .app-shell.book {
-  /* Book chapter mode: TOC stays sticky, content scrolls horizontal */
   display: grid;
   grid-template-columns: 240px 1fr;
   gap: 1rem;
+  align-items: start;
 }
 
 body[data-layout="horizontal"] .app-shell.book .toc,
 body[data-layout="two-pages"] .app-shell.book .toc {
-  height: 100%;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: var(--color-bg);
+  height: var(--page-height);
   overflow-y: auto;
 }
 
 body[data-layout="horizontal"] .app-shell.book article,
 body[data-layout="two-pages"] .app-shell.book article {
-  height: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
+  height: var(--page-height);
 }
 
 body[data-layout="horizontal"] .entry-content,
 body[data-layout="two-pages"] .entry-content {
-  height: 100%;
-  background: var(--color-bg-elevated);
-  padding: var(--page-margin-top) var(--page-margin-right) var(--page-margin-bottom) var(--page-margin-left);
-  border-radius: 4px;
-  box-shadow: 0 8px 24px var(--color-card-shadow);
-  border: 1px solid var(--color-border);
-  column-width: calc(var(--page-width) - var(--page-margin-left) - var(--page-margin-right));
-  column-gap: calc(var(--page-margin-left) + var(--page-margin-right));
+  height: var(--page-height);
+  width: max-content;
+  padding: var(--page-margin-top) 0 var(--page-margin-bottom);
+  background-color: transparent;
+  /* Each "page-width" stripe shows paper bg, followed by 16px gap (canvas color) */
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--color-bg-elevated) 0,
+    var(--color-bg-elevated) var(--page-width),
+    transparent var(--page-width),
+    transparent calc(var(--page-width) + 16px)
+  );
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  column-width: var(--page-width);
+  column-gap: 16px;
   column-fill: auto;
-  column-rule: 1px solid var(--color-border);
+  column-rule: none;
 }
 
-/* In horizontal/two-pages, force entry-content to take width = pages * (col-width + gap) */
+/* Side margins applied to each child so every column gets margin */
+body[data-layout="horizontal"] .entry-content > *,
+body[data-layout="two-pages"] .entry-content > * {
+  margin-left: var(--page-margin-left);
+  margin-right: var(--page-margin-right);
+}
 
 /* Hide chapter-nav in book modes (use horizontal scroll instead) */
 body[data-layout="horizontal"] .chapter-nav,
