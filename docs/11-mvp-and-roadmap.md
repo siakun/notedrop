@@ -171,7 +171,7 @@ summary: MVP 범위, v2 후보, 영구 비-목표, release readiness gate, M1 ~ 
 - GitPublisher (commit + push, mutex)
 - 충돌 처리 UI
 - "Share" / "Unshare" 명령어 동작
-- Public 레포 생성 + GH Actions 셋업 (`.github/workflows/deploy.yml`)
+- Public 레포 생성 + GH Pages 활성화 (사용자 자율: *Deploy from a branch* 또는 자체 `.github/workflows/deploy.yml` 추가). 본 repo 자체는 데모 사이트 없음 — 옵시디언 환경의 publish 파이프라인이 본질이라 정적 데모와 다름
 - URL 클립보드 복사
 
 검증: 발행 → 1분 내 siakun.github.io/notedrop/ 에 live

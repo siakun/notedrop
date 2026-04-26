@@ -185,10 +185,10 @@ notedrop/                                    ← public 레포 루트 (siakun/no
 │   ├── _next/...
 │   └── ...
 ├── README.md                                ← 레포 자체 설명 (사람용)
-└── .github/workflows/deploy.yml             ← 정적 파일 deploy
+└── .nojekyll                                ← Jekyll 비활성 (.md 가 raw 로 서빙)
 ```
 
-GH Pages 가 viewer/ 의 정적 파일을 서빙 + content/, manifest.json 도 같은 도메인에서 서빙. 같은 origin 이라 fetch CORS 문제 없음.
+GH Pages 가 viewer/ 의 정적 파일을 서빙 + content/, manifest.json 도 같은 도메인에서 서빙. 같은 origin 이라 fetch CORS 문제 없음. share repo 의 GH Pages 활성화는 *Deploy from a branch* 모드 (별도 워크플로 없이 root 의 정적 파일 직접 서빙) 또는 사용자가 자체 `.github/workflows/deploy.yml` 추가하는 방식 두 가지 선택 가능.
 
 ## 7.5 자산 처리 규약
 

@@ -68,9 +68,10 @@
       └── types/        manifest, content
 /docs/                  arc42 13 + ADR 28 + postmortems/
 /.github/workflows/
-  ├── release.yml       tag push → plugin build (viewer 자산 zip 인라인) → GH release
-  └── deploy.yml        viewer/** 변경 → next build → GH Pages 자동 배포
+  └── release.yml       tag push → plugin build (viewer 자산 zip 인라인) → GH release
 ```
+
+> 본 repo 자체에는 GH Pages 데모 사이트 없음. viewer 가 옵시디언 환경(plugin)을 통해 share repo (예: `<username>/notedrop-share`) 에 publish 되므로 본 repo 의 정적 데모는 본질적 파이프라인과 다름. 별도 marketing/문서 데모 사이트가 필요하면 추후 분리.
 
 자세한 설계는 [docs/](./docs/) 의 arc42 + ADR 참고.
 

@@ -58,8 +58,9 @@ summary: 시스템 컨텍스트 다이어그램, 외부 인터페이스, in-scop
 | Git (CLI 또는 isomorphic-git) | git clone / add / commit / push | 출력 | public 레포에 변환된 콘텐츠 push |
 | GitHub API | HTTPS + PAT 인증 | 양방향 (간접) | git push 시 인증, 레포 존재 검증 (선택) |
 | 브라우저 (작가, 독자) | HTTP / SSE | 양방향 | manifest, content, /__events 스트림 |
-| GitHub Actions | `.github/workflows/deploy.yml` | 트리거 | push 이벤트 → 정적 파일 deploy |
-| GitHub Pages | HTTPS 정적 파일 서빙 | 출력 | viewer/, content/, manifest.json |
+| GitHub Actions (release.yml, 본 repo) | tag push 트리거 | 출력 | plugin build + viewer 자산 zip 인라인 → release asset |
+| GitHub Actions (share repo, 사용자 자율) | (선택) push 트리거 | 출력 | share repo 가 *Deploy from a branch* 모드로 직접 호스팅 또는 사용자가 자체 deploy 워크플로 추가 |
+| GitHub Pages (share repo) | HTTPS 정적 파일 서빙 | 출력 | viewer 자산 + content + manifest.json (plugin publish 가 push) |
 
 ## 3.3 사용자 역할
 
