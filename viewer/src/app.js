@@ -502,9 +502,13 @@ class StripController {
     if (pages.length === 0) return
     const pageW = pages[0].offsetWidth
     const gap = 16
-    const groupIdx = Math.floor(this.current / this.pagesPerView)
-    const offset = groupIdx * (pageW * this.pagesPerView + gap * this.pagesPerView)
-    this.strip.style.transform = `translateX(-${offset}px)`
+    const groupSize = this.pagesPerView
+    const groupIdx = Math.floor(this.current / groupSize)
+    // Position: each page in strip occupies (pageW + gap), so group's left edge in strip:
+    const groupLeft = groupIdx * groupSize * (pageW + gap)
+    const groupWidth = groupSize * pageW + (groupSize - 1) * gap
+    const groupCenter = groupLeft + groupWidth / 2
+    this.strip.style.transform = `translate(${-groupCenter}px, -50%)`
     updatePageIndicatorFromController(this.current, this.total, this.layout)
   }
 }
