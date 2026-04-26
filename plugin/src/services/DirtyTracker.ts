@@ -8,6 +8,8 @@ import type { PlanFactory } from './PlanFactory.js'
 export type PlanSnapshot = {
   digest: string
   files: Record<string, PublishedFileSnapshot>
+  /** PlanFactory 가 빌드한 cache key — confirmPublished 시 settings 존재. */
+  viewerCacheKey: string | null
 }
 
 export type PublishDiff = {
@@ -19,6 +21,8 @@ export type PublishDiff = {
   previous: Record<string, PublishedFileSnapshot> | null
 }
 
+export type ComputeOptions = { force?: boolean }
+
 /**
  * 발행 dirty 추적 + 컨텐츠 digest 계산.
  *
@@ -29,6 +33,12 @@ export type PublishDiff = {
  *
  * 외부 의존: PublishOrchestrator (plan 가져오기) + saveSettings 콜백.
  * Notice/UI 호출 0 — 순수 비즈니스 로직.
+ *
+ * v0.1.45: PlanFactory 의 viewer fingerprint cache 와 협조. plan.files 의
+ * cached kind entry 는 hash 재계산 skip 하고 baseline 의 hash 를 그대로 사용
+ * → 일반 publish 의 snapshot 가 viewer 자산 144 file 의 sha256 계산을 skip.
+ * force 옵션은 PlanFactory 에 그대로 전파 — 강제 publish 시 cache miss
+ * 전체 unpack/hash.
  */
 export class DirtyTracker {
   constructor(
@@ -65,43 +75,59 @@ export class DirtyTracker {
   async confirmPublished(snapshot: PlanSnapshot): Promise<void> {
     this.settings.lastPublishedDigest = snapshot.digest
     this.settings.lastPublishedFiles = snapshot.files
+    this.settings.lastViewerCacheKey = snapshot.viewerCacheKey
     this.settings.unpublishedChanges = false
     await this.saveSettings()
   }
 
-  async computeDigest(): Promise<string> {
-    return (await this.computeSnapshot()).digest
+  async computeDigest(options?: ComputeOptions): Promise<string> {
+    return (await this.computeSnapshot(options)).digest
   }
 
-  async computeSnapshot(): Promise<PlanSnapshot> {
-    const plan = await this.buildPlan()
+  async computeSnapshot(options?: ComputeOptions): Promise<PlanSnapshot> {
+    const plan = await this.buildPlan({ force: options?.force })
     const hash = crypto.createHash('sha256')
     const files: Record<string, PublishedFileSnapshot> = {}
     const sorted = [...plan.files].sort((a, b) =>
       a.path.localeCompare(b.path)
     )
     for (const file of sorted) {
-      const fileSha = crypto.createHash('sha256')
-      if (file.kind === 'text') {
+      let hex: string
+      let text: string | null
+      if (file.kind === 'cached') {
+        // baseline 에서 가져온 hash 그대로 사용 (재계산 skip — 옵션 A 의
+        // 핵심 절감 지점). text 는 lastPublishedFiles 에서 lookup —
+        // PlanFactory 가 이 path 를 cached entry 로 발행 시 baseline 이
+        // 항상 존재. text 가 binary 인 경우는 null 그대로 (snapshot 포맷
+        // 호환).
+        hex = file.hash
+        text = this.settings.lastPublishedFiles?.[file.path]?.text ?? null
+      } else if (file.kind === 'text') {
+        const fileSha = crypto.createHash('sha256')
         fileSha.update(stripVolatile(file.path, file.content))
+        hex = fileSha.digest('hex')
+        text = file.content
       } else {
+        const fileSha = crypto.createHash('sha256')
         fileSha.update(Buffer.from(file.content))
+        hex = fileSha.digest('hex')
+        text = null
       }
-      const hex = fileSha.digest('hex')
-      files[file.path] = {
-        hash: hex,
-        text: file.kind === 'text' ? file.content : null
-      }
+      files[file.path] = { hash: hex, text }
       hash.update(file.path)
       hash.update('\0')
       hash.update(hex)
       hash.update('\x01')
     }
-    return { digest: hash.digest('hex'), files }
+    return {
+      digest: hash.digest('hex'),
+      files,
+      viewerCacheKey: plan.viewerCacheKey ?? null
+    }
   }
 
-  async computeDiff(): Promise<PublishDiff> {
-    const { files: current } = await this.computeSnapshot()
+  async computeDiff(options?: ComputeOptions): Promise<PublishDiff> {
+    const { files: current } = await this.computeSnapshot(options)
     const prev = this.settings.lastPublishedFiles
     if (!prev) {
       return {

@@ -25,10 +25,11 @@ export type PublishDeps = {
   buildPlan: PlanFactory
   dirtyTracker: DirtyTracker
   logger: Logger
-  onPublishSuccess?: () => Promise<void>
+  onPublishSuccess?: (options?: { force?: boolean }) => Promise<void>
   /**
    * true 면 변경 감지 (lastPublishedFiles 비교) 우회 + plan.files 전체
    * push. forcePublishVault 가 사용. 일반 publishVault 는 false.
+   * PlanFactory 에도 force 로 전파되어 viewer fingerprint cache 무시.
    */
   skipChangeDetection?: boolean
 }
@@ -76,8 +77,10 @@ export function buildPublishDeps(ctx: PluginContext): PublishDeps {
     buildPlan: ctx.buildPlan,
     dirtyTracker: ctx.dirtyTracker,
     logger: ctx.logger,
-    onPublishSuccess: async () => {
-      const snapshot = await ctx.dirtyTracker.computeSnapshot()
+    onPublishSuccess: async (options) => {
+      const snapshot = await ctx.dirtyTracker.computeSnapshot({
+        force: options?.force === true
+      })
       await ctx.dirtyTracker.confirmPublished(snapshot)
     }
   }
@@ -105,25 +108,35 @@ export async function executePublish(
     return
   }
 
+  const force = deps.skipChangeDetection === true
+
   deps.logger.info('publish', 'publish 시작', {
-    skipChangeDetection: deps.skipChangeDetection ?? false,
+    skipChangeDetection: force,
     indexedItemCount: deps.index.list().length,
     targetRepo: settings.targetRepo,
     targetBranch: settings.targetBranch,
     publicRoot: settings.publicRoot,
-    publishViewerAssets: settings.publishViewerAssets
+    publishViewerAssets: settings.publishViewerAssets,
+    hasViewerCacheKey: settings.lastViewerCacheKey !== null
   })
 
   const startNotice = new Notice('notedrop: 발행 준비 중…', 0)
   try {
-    const plan = await deps.buildPlan()
+    const planStart = Date.now()
+    const plan = await deps.buildPlan({ force })
+    const planDurationMs = Date.now() - planStart
     const totalFileCount = plan.files.length
 
     const manifestEntries = plan.files.filter((f) => f.path.endsWith('manifest.json'))
     const nojekyllEntries = plan.files.filter((f) => f.path.endsWith('.nojekyll'))
     const contentEntries = plan.files.filter((f) => f.path.includes('/content/') || f.path.startsWith('content/'))
+    const cachedEntries = plan.files.filter((f) => f.kind === 'cached')
     deps.logger.info('publish', 'plan 빌드 완료', {
       totalFileCount,
+      planDurationMs,
+      viewerCacheHit: plan.viewerCacheHit ?? false,
+      viewerCacheKeyMatch: plan.viewerCacheKey === settings.lastViewerCacheKey,
+      cachedEntryCount: cachedEntries.length,
       manifestEntries: manifestEntries.map((f) => f.path),
       nojekyllEntries: nojekyllEntries.map((f) => f.path),
       contentEntries: contentEntries.map((f) => f.path),
@@ -145,23 +158,30 @@ export async function executePublish(
     // base_tree 가 변경 없는 path 자동 보존이라 blob/tree 등록 회수 절감.
     // force publish (skipChangeDetection=true) 는 일괄 push.
     let pushReason = '변경 감지 우회 (force publish)'
-    if (!deps.skipChangeDetection) {
+    if (!force) {
+      const diffStart = Date.now()
       const diff = await deps.dirtyTracker.computeDiff()
+      const diffDurationMs = Date.now() - diffStart
       if (!diff.hasBaseline) {
         pushReason = '첫 publish (baseline 없음 — 일괄 push)'
-        deps.logger.info('publish', pushReason, { totalFileCount })
+        deps.logger.info('publish', pushReason, { totalFileCount, diffDurationMs })
       } else {
         const changedPaths = new Set([...diff.added, ...diff.modified])
-        const isAlwaysPush = (path: string) =>
-          path.endsWith('manifest.json') || path.endsWith('.nojekyll')
+        // cached entry 는 baseline 의 hash 그대로라 변경 감지 filter 가
+        // 자동 변경 없음 분류. 단 isAlwaysPush (manifest/.nojekyll) 가
+        // cached 도 강제 push 하면 GitHubPublisher 가 빈 content 만나
+        // 오류 — cached 제외 가드.
+        const isAlwaysPush = (path: string, kind: string) =>
+          kind !== 'cached' && (path.endsWith('manifest.json') || path.endsWith('.nojekyll'))
         const beforeFilter = plan.files.length
         plan.files = plan.files.filter(
-          (f) => changedPaths.has(f.path) || isAlwaysPush(f.path)
+          (f) => changedPaths.has(f.path) || isAlwaysPush(f.path, f.kind)
         )
         pushReason = `변경 감지 (added ${diff.added.length}, modified ${diff.modified.length}, removed ${diff.removed.length}, +meta)`
         deps.logger.info('publish', pushReason, {
           beforeFilter,
           afterFilter: plan.files.length,
+          diffDurationMs,
           addedPaths: diff.added,
           modifiedPaths: diff.modified,
           removedPaths: diff.removed,
@@ -185,6 +205,21 @@ export async function executePublish(
       new Notice(
         'notedrop: 변경된 파일 0 — push 안 함 (force publish 면 우회)',
         5000
+      )
+      return
+    }
+
+    // GitHubPublisher 안전 가드: cached entry 가 변경 감지 filter 후
+    // 살아남으면 빈 content push 시도 → 오류. 여기서 명시 차단.
+    const survivedCached = plan.files.filter((f) => f.kind === 'cached')
+    if (survivedCached.length > 0) {
+      deps.logger.error('publish', 'cached entry 가 push 대상에 남음 — 차단', {
+        cachedPaths: survivedCached.map((f) => f.path)
+      })
+      startNotice.hide()
+      new Notice(
+        `notedrop: 내부 오류 — cached entry ${survivedCached.length}개 차단 (Force publish 또는 baseline reset 후 재시도)`,
+        8000
       )
       return
     }
@@ -225,7 +260,7 @@ export async function executePublish(
     )
     if (deps.onPublishSuccess) {
       try {
-        await deps.onPublishSuccess()
+        await deps.onPublishSuccess({ force })
       } catch (cbErr) {
         console.warn('onPublishSuccess hook 실패', cbErr)
       }

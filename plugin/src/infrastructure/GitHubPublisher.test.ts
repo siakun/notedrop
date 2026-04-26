@@ -186,6 +186,33 @@ describe('GitHubPublisher', () => {
       publisher.publish({ files: [], manifest: samplePlan.manifest, warnings: [] })
     ).rejects.toThrow(/empty/)
   })
+
+  it('cached entry 가 plan.files 에 도달하면 throw (v0.1.45 안전 가드)', async () => {
+    // PlanFactory cache hit + 변경 감지 filter bypass 시 GitHubPublisher
+    // 가 빈 content 만나는 것을 차단. publishVault 가 가드해야 정상이지만
+    // 호출 측 버그 시 명시적 fail. 빈 repo 케이스 (404) 로 ref 단계 skip
+    // 후 createBlob 진입 → cached throw.
+    globalThis.fetch = vi.fn(async (url: string | URL) => {
+      const u = String(url)
+      if (u.endsWith('/refs/heads/main')) {
+        return new Response(JSON.stringify({ message: 'Not Found' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
+      return jsonResponse({ sha: 'unused' })
+    }) as never
+    const planWithCached: PublishPlan = {
+      files: [
+        { kind: 'cached', path: 'cached.js', hash: 'baseline-hash' }
+      ],
+      manifest: samplePlan.manifest,
+      warnings: []
+    }
+    await expect(publisher.publish(planWithCached, 'cached test')).rejects.toThrow(
+      /cached entry/
+    )
+  })
 })
 
 function jsonResponse(body: unknown): Response {

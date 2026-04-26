@@ -7,11 +7,18 @@ import type { Manifest, PageFrontmatter } from '../types.js'
 export type PublishedFile =
   | { kind: 'text'; path: string; content: string }
   | { kind: 'binary'; path: string; content: Uint8Array }
+  | { kind: 'cached'; path: string; hash: string }
 
 export type PublishPlan = {
   files: PublishedFile[]
   manifest: Manifest
   warnings: string[]
+  /** viewer 자산 fingerprint cache key — cache hit 시 plan.files 에
+   * cached entry 존재고 이 키 가 confirmPublished 시 settings 존재.
+   * cache miss 면 cacheKey 만 박히고 entries 는 전체 unpack. null 이면
+   * publishViewerAssets=false 인 케이스. */
+  viewerCacheKey?: string | null
+  viewerCacheHit?: boolean
 }
 
 export type OrchestratorOptions = {

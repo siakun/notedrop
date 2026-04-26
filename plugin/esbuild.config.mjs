@@ -1,5 +1,6 @@
 import esbuild from 'esbuild'
 import process from 'node:process'
+import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import builtinModules from 'node:module'
@@ -78,6 +79,7 @@ async function embedViewerAssets() {
       '[notedrop esbuild] viewer/out/ 누락 — "cd ../viewer && npm run build" 먼저 실행해야 viewer 자산이 plugin 에 임베드됩니다. 빈 자산으로 빌드 진행.'
     )
     await fs.writeFile(path.join(dst, 'viewer.zip.b64'), '')
+    await fs.writeFile(path.join(dst, 'viewer.fingerprint.txt'), '')
     return
   }
 
@@ -85,6 +87,7 @@ async function embedViewerAssets() {
   if (files.size === 0) {
     console.warn('[notedrop esbuild] viewer/out/ 가 비어 있음 — 빈 zip 으로 빌드')
     await fs.writeFile(path.join(dst, 'viewer.zip.b64'), '')
+    await fs.writeFile(path.join(dst, 'viewer.fingerprint.txt'), '')
     return
   }
 
@@ -94,9 +97,14 @@ async function embedViewerAssets() {
   }
   const zipped = zipSync(entries, { level: 6 })
   const b64 = Buffer.from(zipped).toString('base64')
+  // Fingerprint = sha256(zipped bytes). 같은 viewer 자산 set + 같은 zip
+  // deterministic 출력이면 동일. plugin 이 publish 시 settings 캡처된
+  // lastViewerCacheKey 와 비교해 unpack/hash 자체 skip 결정.
+  const fingerprint = crypto.createHash('sha256').update(zipped).digest('hex')
   await fs.writeFile(path.join(dst, 'viewer.zip.b64'), b64)
+  await fs.writeFile(path.join(dst, 'viewer.fingerprint.txt'), fingerprint)
   console.log(
-    `[notedrop esbuild] viewer 자산 ${files.size} 개 → zip ${zipped.byteLength} B → base64 ${b64.length} B`
+    `[notedrop esbuild] viewer 자산 ${files.size} 개 → zip ${zipped.byteLength} B → base64 ${b64.length} B (fingerprint ${fingerprint.slice(0, 12)}...)`
   )
 }
 

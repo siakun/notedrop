@@ -7,6 +7,7 @@ import type { PublishIndex } from '../domain/PublishIndex.js'
 import type { ContentTransformer } from '../domain/ContentTransformer.js'
 import type { ManifestBuilder } from '../domain/ManifestBuilder.js'
 import viewerZipB64 from '../embedded/viewer.zip.b64'
+import viewerFingerprintRaw from '../embedded/viewer.fingerprint.txt'
 
 /**
  * 발행 plan 의 단일 출처. orchestrator (manifest + content) + viewer 자산
@@ -14,10 +15,20 @@ import viewerZipB64 from '../embedded/viewer.zip.b64'
  *
  * publishVault 가 push 할 때, DirtyTracker 가 변경 감지 snapshot 을 만들
  * 때 모두 같은 함수 사용 → diff 비교가 viewer 자산도 포함하여 정확.
+ *
+ * v0.1.45: viewer fingerprint cache 도입. settings.lastViewerCacheKey 와
+ * `${VIEWER_FINGERPRINT}|${publicRoot}|${repoSegment}` 비교가 동일이면
+ * viewer.zip unpack/path-replace 자체 skip + baseline 의 hash 를 cached
+ * entry 로 plan.files 에 등록. 변경 감지 filter 가 cached entry 를 push
+ * 안 함 (base_tree 보존). 효과: 일반 publish 의 plan 빌드 + DirtyTracker
+ * snapshot 에서 viewer 자산의 unpack + 144 file SHA-256 hash 모두 skip.
  */
-export type PlanFactory = () => Promise<PublishPlan>
+export type PlanFactoryOptions = { force?: boolean }
+export type PlanFactory = (options?: PlanFactoryOptions) => Promise<PublishPlan>
 
 const VIEWER_BASE_PLACEHOLDER = '/__NOTEDROP_BASE__'
+
+export const VIEWER_FINGERPRINT = (viewerFingerprintRaw ?? '').trim()
 
 const TEXT_EXTENSIONS = new Set([
   'html', 'htm', 'css', 'js', 'mjs', 'json', 'txt', 'md', 'svg', 'xml', 'map'
@@ -42,7 +53,7 @@ export function createPlanFactory(
   deps: PlanFactoryDeps,
   settings: PluginSettings
 ): PlanFactory {
-  return async () => {
+  return async (options) => {
     const orchestrator = new PublishOrchestrator(
       deps.vault,
       deps.index,
@@ -51,12 +62,60 @@ export function createPlanFactory(
       { publicRoot: settings.publicRoot, generatedBy: 'notedrop-plugin' }
     )
     const plan = await orchestrator.plan()
+    plan.viewerCacheKey = null
+    plan.viewerCacheHit = false
     if (settings.publishViewerAssets) {
       const segment = deriveRepoSegment(settings.targetRepo)
-      plan.files.push(...collectViewerFiles(settings.publicRoot, segment))
+      const cacheKey = buildViewerCacheKey(VIEWER_FINGERPRINT, settings.publicRoot, segment)
+      plan.viewerCacheKey = cacheKey
+      const force = options?.force === true
+      const cacheHit = !force
+        && VIEWER_FINGERPRINT !== ''
+        && settings.lastViewerCacheKey === cacheKey
+        && settings.lastPublishedFiles !== null
+      if (cacheHit) {
+        plan.viewerCacheHit = true
+        // baseline 의 viewer 자산 path 만 cached entry 로 등록. manifest +
+        // content 는 orchestrator 가 이미 push (변경 없으면 변경 감지 filter
+        // out, 변경 있으면 push). cached entry 는 hash 만 존재고 변경
+        // 감지 filter 가 변경 없음 분류 → push 안 됨 → base_tree 가 보존.
+        const baseline = settings.lastPublishedFiles!
+        for (const [path, snap] of Object.entries(baseline)) {
+          if (isViewerAssetPath(path, settings.publicRoot)) {
+            plan.files.push({ kind: 'cached', path, hash: snap.hash })
+          }
+        }
+      } else {
+        plan.files.push(...collectViewerFiles(settings.publicRoot, segment))
+      }
     }
     return plan
   }
+}
+
+/**
+ * cache key 빌드. fingerprint 외 publicRoot 와 repoSegment 도 포함 — 둘 중
+ * 하나만 바뀌어도 viewer 자산의 path 또는 content 가 달라지므로 cache 무효.
+ */
+export function buildViewerCacheKey(
+  fingerprint: string,
+  publicRoot: string,
+  repoSegment: string
+): string {
+  return `${fingerprint}|${publicRoot}|${repoSegment}`
+}
+
+/**
+ * baseline 의 path 가 viewer 자산인지 (manifest/content 가 아닌지) 분류.
+ * cache hit 시 이 함수가 true 인 path 만 cached entry 로 plan.files 에 존재.
+ */
+export function isViewerAssetPath(path: string, publicRoot: string): boolean {
+  const prefix = publicRoot.trim().replace(/^\/|\/$/g, '')
+  if (prefix !== '' && !path.startsWith(`${prefix}/`)) return false
+  const stripped = prefix === '' ? path : path.slice(prefix.length + 1)
+  if (stripped === 'manifest.json') return false
+  if (stripped.startsWith('content/')) return false
+  return true
 }
 
 /**

@@ -19,8 +19,10 @@ import type { CommandDef } from './types.js'
 export async function resetPublishBaseline(ctx: PluginContext): Promise<void> {
   const hadBaseline = ctx.settings.lastPublishedDigest !== null
     || ctx.settings.lastPublishedFiles !== null
+    || ctx.settings.lastViewerCacheKey !== null
   ctx.settings.lastPublishedDigest = null
   ctx.settings.lastPublishedFiles = null
+  ctx.settings.lastViewerCacheKey = null
   ctx.settings.unpublishedChanges = true
   await ctx.saveSettings()
   if (hadBaseline) {
