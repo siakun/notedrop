@@ -208,7 +208,7 @@ function renderWikilink(ref: import('./types.js').Reference): string {
   if (res.kind === 'published-note') {
     const slugOrHash = res.slug ?? res.hash
     const text = ref.alias ?? ref.target
-    return `[${text}](/notedrop/${slugOrHash})`
+    return `[${text}](#/${slugOrHash}/)`
   }
   if (res.kind === 'unpublished-note') {
     if (ref.alias !== undefined) {

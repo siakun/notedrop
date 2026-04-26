@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import type { ManifestItem } from '@/types/manifest'
 
 export type SidebarProps = {
@@ -14,8 +13,8 @@ export default function Sidebar({ entry, chapters, activeHash, onSelect }: Sideb
   return (
     <nav className="notedrop-sidebar" aria-label="챕터 목차">
       <header className="notedrop-sidebar-entry">
-        <Link
-          href={`/${entry.slug ?? entry.hash}/`}
+        <a
+          href={`#/${entry.slug ?? entry.hash}/`}
           onClick={(e) => {
             if (onSelect) {
               e.preventDefault()
@@ -24,7 +23,7 @@ export default function Sidebar({ entry, chapters, activeHash, onSelect }: Sideb
           }}
         >
           {entry.title}
-        </Link>
+        </a>
       </header>
       <ol className="notedrop-sidebar-chapters">
         {chapters.map((ch) => (

@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { useManifest } from '@/hooks/useManifest'
 import LiveReloadProvider from '@/components/providers/LiveReloadProvider'
 import PageSizeSelector from '@/components/common/PageSizeSelector'
@@ -52,7 +51,7 @@ export default function HomeClient() {
           <ul className="notedrop-entry-list">
             {entries.map((entry) => (
               <li key={entry.hash} className="notedrop-entry-card">
-                <Link href={`/${entry.slug ?? entry.hash}/`}>
+                <a href={`#/${entry.slug ?? entry.hash}/`}>
                   {entry.cover && (
                     <div className="notedrop-entry-cover">
                       <img src={entry.cover} alt="" />
@@ -64,7 +63,7 @@ export default function HomeClient() {
                       {entry.render === 'book' ? '책' : '문서'}
                     </p>
                   </div>
-                </Link>
+                </a>
               </li>
             ))}
           </ul>

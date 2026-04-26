@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { useContent } from '@/hooks/useContent'
 import { useManifest } from '@/hooks/useManifest'
 import BookViewer from './BookViewer'
@@ -25,7 +24,7 @@ export default function EntryClient({ hash }: { hash: string }) {
   if (error) {
     return (
       <main className="notedrop-entry">
-        <Link href="/">← 홈</Link>
+        <a href="#/">← 홈</a>
         <h1>오류</h1>
         <p>{error.message}</p>
       </main>
@@ -43,7 +42,7 @@ export default function EntryClient({ hash }: { hash: string }) {
   return (
     <LiveReloadProvider>
       <header className="notedrop-header">
-        <Link href="/">← 홈</Link>
+        <a href="#/">← 홈</a>
         <h1>{content.frontmatter.title}</h1>
         <div className="notedrop-header-controls">
           <PageSizeSelector />

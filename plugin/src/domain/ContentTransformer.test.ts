@@ -240,7 +240,7 @@ describe('ContentTransformer.transform() - HIDE policy', () => {
 })
 
 describe('ContentTransformer.transform() - wikilink safety', () => {
-  it('published wikilink becomes markdown link to /notedrop/<slug>', async () => {
+  it('published wikilink becomes markdown link to #/<slug>/', async () => {
     const { transformer } = await setup({
       '/a.md': { body: 'see [[Other]] here', fm: { 'notedrop-publish': true } },
       '/Other.md': {
@@ -249,7 +249,7 @@ describe('ContentTransformer.transform() - wikilink safety', () => {
       }
     })
     const r = await transformer.transform('/a.md')
-    expect(r.markdown).toContain('[Other](/notedrop/other-slug)')
+    expect(r.markdown).toContain('[Other](#/other-slug/)')
     expect(r.markdown).not.toContain('[[Other]]')
   })
 
@@ -260,7 +260,7 @@ describe('ContentTransformer.transform() - wikilink safety', () => {
     })
     const otherHash = index.getByPath('/Other.md')!.hash
     const r = await transformer.transform('/a.md')
-    expect(r.markdown).toContain(`[Other](/notedrop/${otherHash})`)
+    expect(r.markdown).toContain(`[Other](#/${otherHash}/)`)
   })
 
   it('published wikilink with alias renders alias as link text', async () => {
@@ -272,7 +272,7 @@ describe('ContentTransformer.transform() - wikilink safety', () => {
       }
     })
     const r = await transformer.transform('/a.md')
-    expect(r.markdown).toContain('[see this](/notedrop/o)')
+    expect(r.markdown).toContain('[see this](#/o/)')
   })
 
   it('unpublished wikilink without alias becomes dead link with note name', async () => {
@@ -307,7 +307,7 @@ describe('ContentTransformer.transform() - wikilink safety', () => {
       }
     })
     const r = await transformer.transform('/a.md')
-    const occurrences = r.markdown.split('[Other](/notedrop/o)').length - 1
+    const occurrences = r.markdown.split('[Other](#/o/)').length - 1
     expect(occurrences).toBe(2)
   })
 

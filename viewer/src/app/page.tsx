@@ -1,5 +1,5 @@
-import HomeClient from '@/components/viewer/HomeClient'
+import RootClient from '@/components/viewer/RootClient'
 
 export default function Page() {
-  return <HomeClient />
+  return <RootClient />
 }
