@@ -7,7 +7,7 @@ tags:
   - notedrop
   - spec
   - readme
-summary: notedrop 프로젝트 spec 디렉터리 인덱스. arc42 13개 + ADR 27개. 별도 개발 디렉터리로 이전 시 참고 노트 포함
+summary: notedrop 프로젝트 spec 디렉터리 인덱스. arc42 13개 + 프로젝트 고유 1 (13-dogfood-ux) + ADR 27개. 별도 개발 디렉터리로 이전 시 참고 노트 포함
 ---
 # notedrop spec
 
@@ -45,6 +45,7 @@ summary: notedrop 프로젝트 spec 디렉터리 인덱스. arc42 13개 + ADR 27
 | 10 | [10-quality-and-test.md](10-quality-and-test.md) | 테스트 전략, 품질 목표 |
 | 11 | [11-mvp-and-roadmap.md](11-mvp-and-roadmap.md) | MVP 범위, v2 후보, 마일스톤 |
 | 12 | [12-glossary.md](12-glossary.md) | 용어집 |
+| 13 | [13-dogfood-ux-requirements.md](13-dogfood-ux-requirements.md) | dogfood 주도 UX 요구사항 (명명·UI 패턴·설정 시맨틱·영속화·race 방어) |
 
 ### ADR (24개)
 

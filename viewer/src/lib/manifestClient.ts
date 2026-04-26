@@ -1,5 +1,4 @@
 import type { Manifest } from '@/types/manifest'
-import { withBase } from './basePath'
 
 let cached: Manifest | null = null
 let inflight: Promise<Manifest> | null = null
@@ -9,7 +8,7 @@ export async function fetchManifest(force = false): Promise<Manifest> {
   if (!force && cached) return cached
   if (!force && inflight) return inflight
   inflight = (async () => {
-    const res = await fetch(withBase('/manifest.json'), { cache: 'no-store' })
+    const res = await fetch('manifest.json', { cache: 'no-store' })
     if (!res.ok) throw new Error(`manifest fetch failed: ${res.status}`)
     const data = (await res.json()) as Manifest
     cached = data

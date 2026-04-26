@@ -1,6 +1,5 @@
 import type { PageContent, PageFrontmatter } from '@/types/content'
 import type { ItemType, RenderMode } from '@/types/manifest'
-import { withBase } from './basePath'
 
 const cache = new Map<string, PageContent>()
 const inflight = new Map<string, Promise<PageContent>>()
@@ -14,7 +13,7 @@ export async function fetchContent(hash: string, force = false): Promise<PageCon
     if (pending) return pending
   }
   const promise = (async () => {
-    const res = await fetch(withBase(`/content/${hash}/index.md`), { cache: 'no-store' })
+    const res = await fetch(`content/${hash}/index.md`, { cache: 'no-store' })
     if (!res.ok) throw new Error(`content fetch failed (${hash}): ${res.status}`)
     const raw = await res.text()
     const parsed = parsePageMarkdown(raw)
