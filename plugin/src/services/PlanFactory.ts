@@ -1,6 +1,11 @@
 import { unzipSync } from 'fflate'
-import type { PublishOrchestrator, PublishedFile, PublishPlan } from '../domain/PublishOrchestrator.js'
+import type { PublishedFile, PublishPlan } from '../domain/PublishOrchestrator.js'
+import { PublishOrchestrator } from '../domain/PublishOrchestrator.js'
 import type { PluginSettings } from '../settings/PluginSettings.js'
+import type { VaultFs } from '../ports/VaultFs.js'
+import type { PublishIndex } from '../domain/PublishIndex.js'
+import type { ContentTransformer } from '../domain/ContentTransformer.js'
+import type { ManifestBuilder } from '../domain/ManifestBuilder.js'
 import viewerZipB64 from '../embedded/viewer.zip.b64'
 
 /**
@@ -18,11 +23,33 @@ const TEXT_EXTENSIONS = new Set([
   'html', 'htm', 'css', 'js', 'mjs', 'json', 'txt', 'md', 'svg', 'xml', 'map'
 ])
 
+export type PlanFactoryDeps = {
+  vault: VaultFs
+  index: PublishIndex
+  transformer: ContentTransformer
+  manifestBuilder: ManifestBuilder
+}
+
+/**
+ * 매 호출 시 fresh PublishOrchestrator 생성 — settings (publicRoot,
+ * publishViewerAssets, targetRepo) 변경 즉시 반영. 사용자가 SettingsTab
+ * 에서 변경한 후 plugin reload 의무 사라짐.
+ *
+ * 이전 (v0.1.36 까지): main.ts onload 에서 orchestrator 1 회 생성. settings
+ * 변경 후 reload 전엔 옛 publicRoot 사용. publish 가 잘못된 path 로 push.
+ */
 export function createPlanFactory(
-  orchestrator: PublishOrchestrator,
+  deps: PlanFactoryDeps,
   settings: PluginSettings
 ): PlanFactory {
   return async () => {
+    const orchestrator = new PublishOrchestrator(
+      deps.vault,
+      deps.index,
+      deps.transformer,
+      deps.manifestBuilder,
+      { publicRoot: settings.publicRoot, generatedBy: 'notedrop-plugin' }
+    )
     const plan = await orchestrator.plan()
     if (settings.publishViewerAssets) {
       const segment = deriveRepoSegment(settings.targetRepo)

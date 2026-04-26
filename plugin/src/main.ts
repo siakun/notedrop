@@ -59,7 +59,10 @@ export default class NotedropPlugin extends Plugin {
     })
 
     const saveSettings = (): Promise<void> => this.saveSettings()
-    const buildPlan = createPlanFactory(orchestrator, this.settings)
+    const buildPlan = createPlanFactory(
+      { vault, index, transformer, manifestBuilder },
+      this.settings
+    )
     const dirtyTracker = new DirtyTracker(buildPlan, this.settings, saveSettings)
     this.seedPersistence = new SeedPersistence(
       index,
