@@ -25,15 +25,20 @@ summary: v0.1.45 옵션 A (viewer fingerprint cache + 단계별 진단) 구현 +
 | 4 곳 version 0.1.44 → 0.1.45 갱신 | **완료** |
 | plugin typecheck + 242 tests | **통과** |
 | viewer typecheck + 54 tests | **통과** (회귀 없음) |
-| commit | **완료** (`774e16b`) |
-| push origin main | **미실행** (사용자 승인 의무) |
-| tag v0.1.45 + push origin v0.1.45 | **미실행** (release.yml trigger) |
-| BRAT 사용자 update + dogfood | **미실행** (release 후) |
+| commit `774e16b` (v0.1.45 perf) | **완료 + push + tag 0.1.45** |
+| commit `c6f63f3` (handoff 본 파일) | **완료 + push** |
+| commit `05c3f5c` (deploy.yml 삭제) | **완료 + push** (사용자 승인) |
+| Release.yml run for tag 0.1.45 | **성공** (사용자 확인) |
+| Deploy.yml | **삭제됨** — 본 repo 의 GH Pages 데모는 *옵시디언 환경의 publish 파이프라인과 본질적으로 다름* (사용자 결정 2026-04-27). share repo 의 Pages 활성화는 사용자 자율 |
+| BRAT 사용자 update + dogfood | **미실행** (사용자 단계) |
 | 옵션 B (명령어 분리) | **미결정** (옵션 A 측정 후 사용자 결정) |
 
-본 세션 main HEAD 가 origin/main 보다 **2 commits ahead**:
-- `af5cc06` 📝 docs (이전 세션 미push)
-- `774e16b` ⚡ perf(publish): v0.1.45 viewer fingerprint cache + 단계별 진단 (옵션 A)
+본 세션 main HEAD = `05c3f5c`. origin/main 와 동기 (모두 push 완료).
+
+세션 commit 흐름:
+- `774e16b` ⚡ perf(publish): v0.1.45 viewer fingerprint cache + 단계별 진단 (옵션 A) — tag `0.1.45` 발행, release.yml 통과
+- `c6f63f3` 📝 docs(handoff): 본 핸드오프
+- `05c3f5c` 🔧 chore(ci): deploy.yml 삭제 — 본 repo GH Pages 데모 불필요 (사용자 결정)
 
 ## 1. 본 세션 산출물 목록
 
@@ -125,16 +130,9 @@ data 에 단계별 측정값 기록:
 
 ## 4. 다음 세션 범위
 
-### Task 4.1 — push + tag (사용자 승인 후)
+### Task 4.1 — release 완료 (이미 처리됨, 본 세션 2026-04-27)
 
-```bash
-git push origin main          # af5cc06 + 774e16b 둘 다
-git tag 0.1.45                # 774e16b 에 존재
-git push origin 0.1.45         # release.yml trigger
-```
-
-release.yml 가 viewer 빌드 + plugin 빌드 + 211+α tests + manifest verify
-통과 후 release asset (main.js + manifest.json + styles.css) upload.
+`774e16b` push + tag `0.1.45` push 후 release.yml 성공. release asset 발행.
 
 ### Task 4.2 — 사용자 dogfood + 측정
 
@@ -162,15 +160,17 @@ release.yml 가 viewer 빌드 + plugin 빌드 + 211+α tests + manifest verify
 - 신규 `Sync viewer assets` 명령어 = viewer 자산만 push
 - §13 dogfood-ux-requirements 갱신 (UX 변경이라 spec 명문화의무)
 
-### Task 4.4 — viewer.fingerprint.txt 빌드 검증 (Task 4.1 전)
+### Task 4.4 — viewer.fingerprint.txt 빌드 검증 (이미 release.yml 가 검증)
 
-Task 4.1 직전 *로컬 빌드 검증* 권장:
+release.yml 의 plugin build 단계가 esbuild 의 embedViewerAssets() 통과 →
+viewer.fingerprint.txt 정상 임베드 → main.js 안 import 정상. release.yml 성공
+이 곧 fingerprint 임베드 검증 결과.
 
-```bash
-cd plugin && npm run build
-# → embedded/viewer.fingerprint.txt 64-char hex 존재 확인
-# → main.js 안의 `lastViewerCacheKey` 와 import 모두 정상
-```
+### Task 4.5 — Action monitoring 의무 (메모리 가드레일, 2026-04-27 도입)
+
+push 후 (특히 tag push) `gh run list` + `gh run view <id> --log-failed` 로
+워크플로 결과 자발적 확인 + 실패 시 원인 발췌 + 우회책 제시. 본 가드레일은
+`feedback_action_monitoring_의무.md` 메모리에 존재. 다음 세션도 이 의무 적용.
 
 ## 5. 측정 결과 (Phase 1)
 
