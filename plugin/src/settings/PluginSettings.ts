@@ -12,6 +12,7 @@ export type PluginSettings = {
   publishedSeeds: SeedEntry[]
   unpublishedChanges: boolean
   lastPublishedDigest: string | null
+  lastPublishedFileHashes: Record<string, string> | null
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -25,5 +26,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   autoUnpublish: false,
   publishedSeeds: [],
   unpublishedChanges: true,
-  lastPublishedDigest: null
+  lastPublishedDigest: null,
+  lastPublishedFileHashes: null
 }

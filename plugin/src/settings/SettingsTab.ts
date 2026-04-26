@@ -2,6 +2,7 @@ import { PluginSettingTab, Setting } from 'obsidian'
 import type { App } from 'obsidian'
 import type NotedropPlugin from '../main.js'
 import { deriveShareUrlBase } from './shareUrl.js'
+import { showPublishDiff } from '../commands/showPublishDiff.js'
 
 export class NotedropSettingTab extends PluginSettingTab {
   private revalidating = false
@@ -66,6 +67,11 @@ export class NotedropSettingTab extends PluginSettingTab {
               ? `변경 사항 있음 (${indexCount}개 항목). 클릭하면 GitHub 에 push.`
               : `최신 상태 (${indexCount}개 항목 발행됨). 변경이 생기면 다시 활성화됩니다.`
       )
+      .addButton((btn) => {
+        btn.setButtonText('변경 보기')
+        if (indexCount === 0) btn.setDisabled(true)
+        btn.onClick(() => showPublishDiff(this.app, this.plugin))
+      })
       .addButton((btn) => {
         btn.setButtonText(dirty ? '발행' : '발행됨')
         if (canPublish) btn.setCta()

@@ -184,7 +184,9 @@ export default class NotedropPlugin extends Plugin {
         transformer: this.transformer,
         manifestBuilder: this.manifestBuilder,
         onPublishSuccess: async () => {
-          this.settings.lastPublishedDigest = await this.computeContentDigest()
+          const snapshot = await this.computePlanSnapshot()
+          this.settings.lastPublishedDigest = snapshot.digest
+          this.settings.lastPublishedFileHashes = snapshot.fileHashes
           this.settings.unpublishedChanges = false
           await this.saveSettings()
         }
@@ -206,20 +208,65 @@ export default class NotedropPlugin extends Plugin {
   }
 
   async computeContentDigest(): Promise<string> {
+    return (await this.computePlanSnapshot()).digest
+  }
+
+  async computePlanSnapshot(): Promise<{
+    digest: string
+    fileHashes: Record<string, string>
+  }> {
     const plan = await this.orchestrator.plan()
     const hash = crypto.createHash('sha256')
+    const fileHashes: Record<string, string> = {}
     const sorted = [...plan.files].sort((a, b) => a.path.localeCompare(b.path))
     for (const file of sorted) {
+      const fileSha = crypto.createHash('sha256')
+      if (file.kind === 'text') {
+        fileSha.update(stripVolatile(file.path, file.content))
+      } else {
+        fileSha.update(Buffer.from(file.content))
+      }
+      fileHashes[file.path] = fileSha.digest('hex')
       hash.update(file.path)
       hash.update('\0')
-      if (file.kind === 'text') {
-        hash.update(stripVolatile(file.path, file.content))
-      } else {
-        hash.update(Buffer.from(file.content))
-      }
+      hash.update(fileHashes[file.path]!)
       hash.update('\x01')
     }
-    return hash.digest('hex')
+    return { digest: hash.digest('hex'), fileHashes }
+  }
+
+  async computePublishDiff(): Promise<{
+    added: string[]
+    modified: string[]
+    removed: string[]
+    hasBaseline: boolean
+  }> {
+    const { fileHashes: current } = await this.computePlanSnapshot()
+    const prev = this.settings.lastPublishedFileHashes
+    if (!prev) {
+      return {
+        added: Object.keys(current).sort(),
+        modified: [],
+        removed: [],
+        hasBaseline: false
+      }
+    }
+    const added: string[] = []
+    const modified: string[] = []
+    const removed: string[] = []
+    for (const [path, hex] of Object.entries(current)) {
+      if (!(path in prev)) added.push(path)
+      else if (prev[path] !== hex) modified.push(path)
+    }
+    for (const path of Object.keys(prev)) {
+      if (!(path in current)) removed.push(path)
+    }
+    return {
+      added: added.sort(),
+      modified: modified.sort(),
+      removed: removed.sort(),
+      hasBaseline: true
+    }
   }
 
   private markDirtyAndSchedule(): void {
