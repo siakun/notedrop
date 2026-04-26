@@ -4,11 +4,34 @@ import type NotedropPlugin from '../main.js'
 import { deriveShareUrlBase } from './shareUrl.js'
 
 export class NotedropSettingTab extends PluginSettingTab {
+  private revalidating = false
+
   constructor(app: App, private plugin: NotedropPlugin) {
     super(app, plugin)
   }
 
   display(): void {
+    this.render()
+    void this.revalidateInBackground()
+  }
+
+  private async revalidateInBackground(): Promise<void> {
+    if (this.revalidating) return
+    this.revalidating = true
+    try {
+      const before = this.plugin.hasUnpublishedChanges()
+      const after = await this.plugin.revalidateDirty()
+      if (before !== after && this.containerEl.isShown()) {
+        this.render()
+      }
+    } catch (err) {
+      console.warn('notedrop revalidateDirty 실패', err)
+    } finally {
+      this.revalidating = false
+    }
+  }
+
+  private render(): void {
     const { containerEl } = this
     containerEl.empty()
 
@@ -16,6 +39,16 @@ export class NotedropSettingTab extends PluginSettingTab {
     containerEl.createEl('p', {
       text: '선택한 노트를 GitHub Pages 정적 뷰어로 발행합니다. 알파 단계 (BRAT) 입니다.'
     })
+
+    this.renderActions(containerEl)
+    this.renderPublishSettings(containerEl)
+    this.renderPreviewSettings(containerEl)
+    this.renderBehaviorSettings(containerEl)
+    this.renderSharedList(containerEl)
+  }
+
+  private renderActions(containerEl: HTMLElement): void {
+    containerEl.createEl('h3', { text: '액션' })
 
     const dirty = this.plugin.hasUnpublishedChanges()
     const indexCount = this.plugin.indexList().length
@@ -28,7 +61,7 @@ export class NotedropSettingTab extends PluginSettingTab {
         indexCount === 0
           ? '공유된 노트가 없습니다. 노트 frontmatter 에 notedrop-publish: true 추가 후 발행 가능.'
           : !this.plugin.settings.githubPat || !this.plugin.settings.targetRepo
-            ? 'PAT 와 target repository 가 필요합니다 (위 항목 입력 후 활성화).'
+            ? 'PAT 와 target repository 가 필요합니다 (아래 발행 설정 입력 후 활성화).'
             : dirty
               ? `변경 사항 있음 (${indexCount}개 항목). 클릭하면 GitHub 에 push.`
               : `최신 상태 (${indexCount}개 항목 발행됨). 변경이 생기면 다시 활성화됩니다.`
@@ -47,6 +80,56 @@ export class NotedropSettingTab extends PluginSettingTab {
           }
         })
       })
+
+    const previewStatus = this.plugin.previewStatus()
+    const isRunning = previewStatus.state === 'running'
+    const previewDesc = createFragment((frag) => {
+      if (isRunning) {
+        frag.appendText('실행 중 — ')
+        const link = frag.createEl('a', {
+          text: previewStatus.url,
+          href: previewStatus.url
+        })
+        link.setAttr('target', '_blank')
+        link.setAttr('rel', 'noopener')
+      } else {
+        frag.appendText('중지됨. 시작하면 로컬 라이브 프리뷰가 활성화됩니다.')
+      }
+    })
+    new Setting(containerEl)
+      .setName('Preview server')
+      .setDesc(previewDesc)
+      .addButton((btn) => {
+        if (isRunning) {
+          btn
+            .setButtonText('중지')
+            .setWarning()
+            .onClick(async () => {
+              try {
+                await this.plugin.togglePreview(false)
+              } catch (err) {
+                console.error('preview stop 실패', err)
+              }
+              this.display()
+            })
+        } else {
+          btn
+            .setButtonText('시작')
+            .setCta()
+            .onClick(async () => {
+              try {
+                await this.plugin.togglePreview(true)
+              } catch (err) {
+                console.error('preview start 실패', err)
+              }
+              this.display()
+            })
+        }
+      })
+  }
+
+  private renderPublishSettings(containerEl: HTMLElement): void {
+    containerEl.createEl('h3', { text: '발행 설정' })
 
     new Setting(containerEl)
       .setName('GitHub PAT')
@@ -123,10 +206,14 @@ export class NotedropSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings()
           })
       )
+  }
+
+  private renderPreviewSettings(containerEl: HTMLElement): void {
+    containerEl.createEl('h3', { text: '미리보기 설정' })
 
     new Setting(containerEl)
       .setName('Preview port')
-      .setDesc('로컬 프리뷰 서버 포트 (1024–65535). 향후 마일스톤에서 사용.')
+      .setDesc('로컬 프리뷰 서버 포트 (1024–65535).')
       .addText((text) =>
         text
           .setPlaceholder('4321')
@@ -140,52 +227,6 @@ export class NotedropSettingTab extends PluginSettingTab {
           })
       )
 
-    const previewStatus = this.plugin.previewStatus()
-    const isRunning = previewStatus.state === 'running'
-    const previewDesc = createFragment((frag) => {
-      if (isRunning) {
-        frag.appendText('실행 중 — ')
-        const link = frag.createEl('a', {
-          text: previewStatus.url,
-          href: previewStatus.url
-        })
-        link.setAttr('target', '_blank')
-        link.setAttr('rel', 'noopener')
-      } else {
-        frag.appendText('중지됨. 시작하면 로컬 라이브 프리뷰가 활성화됩니다.')
-      }
-    })
-    new Setting(containerEl)
-      .setName('Preview server')
-      .setDesc(previewDesc)
-      .addButton((btn) => {
-        if (isRunning) {
-          btn
-            .setButtonText('중지')
-            .setWarning()
-            .onClick(async () => {
-              try {
-                await this.plugin.togglePreview(false)
-              } catch (err) {
-                console.error('preview stop 실패', err)
-              }
-              this.display()
-            })
-        } else {
-          btn
-            .setButtonText('시작')
-            .setCta()
-            .onClick(async () => {
-              try {
-                await this.plugin.togglePreview(true)
-              } catch (err) {
-                console.error('preview start 실패', err)
-              }
-              this.display()
-            })
-        }
-      })
-
     new Setting(containerEl)
       .setName('Auto start preview')
       .setDesc('Obsidian 시작 시 프리뷰 서버 자동 시작.')
@@ -197,6 +238,10 @@ export class NotedropSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings()
           })
       )
+  }
+
+  private renderBehaviorSettings(containerEl: HTMLElement): void {
+    containerEl.createEl('h3', { text: '동작 옵션' })
 
     new Setting(containerEl)
       .setName('Auto unpublish on delete')
@@ -209,17 +254,19 @@ export class NotedropSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings()
           })
       )
+  }
 
+  private renderSharedList(containerEl: HTMLElement): void {
     containerEl.createEl('h3', { text: '공유된 노트' })
     const list = containerEl.createEl('ul')
     const items = this.plugin.indexList()
     if (items.length === 0) {
       list.createEl('li', { text: '아직 공유된 노트가 없습니다.' })
-    } else {
-      for (const item of items) {
-        const li = list.createEl('li')
-        li.setText(`${item.title}  (${item.render})  ${item.filePath}`)
-      }
+      return
+    }
+    for (const item of items) {
+      const li = list.createEl('li')
+      li.setText(`${item.title}  (${item.render})  ${item.filePath}`)
     }
   }
 }

@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { Plugin } from 'obsidian'
 import { ObsidianVaultFs } from './infrastructure/ObsidianVaultFs.js'
 import { ObsidianMetaCache } from './infrastructure/ObsidianMetaCache.js'
@@ -183,12 +184,42 @@ export default class NotedropPlugin extends Plugin {
         transformer: this.transformer,
         manifestBuilder: this.manifestBuilder,
         onPublishSuccess: async () => {
+          this.settings.lastPublishedDigest = await this.computeContentDigest()
           this.settings.unpublishedChanges = false
           await this.saveSettings()
         }
       },
       this.settings
     )
+  }
+
+  async revalidateDirty(): Promise<boolean> {
+    if (!this.settings.lastPublishedDigest) return this.settings.unpublishedChanges
+    if (!this.settings.unpublishedChanges) return false
+    const fresh = await this.computeContentDigest()
+    if (fresh === this.settings.lastPublishedDigest) {
+      this.settings.unpublishedChanges = false
+      await this.saveSettings()
+      return false
+    }
+    return true
+  }
+
+  async computeContentDigest(): Promise<string> {
+    const plan = await this.orchestrator.plan()
+    const hash = crypto.createHash('sha256')
+    const sorted = [...plan.files].sort((a, b) => a.path.localeCompare(b.path))
+    for (const file of sorted) {
+      hash.update(file.path)
+      hash.update('\0')
+      if (file.kind === 'text') {
+        hash.update(stripVolatile(file.path, file.content))
+      } else {
+        hash.update(Buffer.from(file.content))
+      }
+      hash.update('\x01')
+    }
+    return hash.digest('hex')
   }
 
   private markDirtyAndSchedule(): void {
@@ -228,6 +259,16 @@ export default class NotedropPlugin extends Plugin {
     this.settings.publishedSeeds = fresh
     await this.saveSettings()
   }
+}
+
+function stripVolatile(path: string, content: string): string {
+  if (path.endsWith('manifest.json')) {
+    return content.replace(/"(generatedAt|updatedAt)":\s*"[^"]*"/g, '"$1":""')
+  }
+  if (path.endsWith('index.md')) {
+    return content.replace(/^updatedAt:.*$/m, 'updatedAt:')
+  }
+  return content
 }
 
 function dashifyHash(hash: string): string {
