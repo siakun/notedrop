@@ -6,6 +6,7 @@ import { resetBaselineCommand } from './resetBaseline.js'
 import { exportBaselineCommand } from './exportBaseline.js'
 import { dumpLogTailCommand } from './dumpLogTail.js'
 import { triggerPublishSmartCommand, triggerPublishForceCommand } from './triggerPublishWithTrace.js'
+import { cleanupStaleBuildIdCommand } from './cleanupStaleBuildId.js'
 
 /**
  * Dogfood 명령 — debugMode==true 시만 등록.
@@ -24,5 +25,6 @@ export const DOGFOOD_COMMAND_REGISTRY: readonly CommandDef[] = [
   exportBaselineCommand,
   dumpLogTailCommand,
   triggerPublishSmartCommand,
-  triggerPublishForceCommand
+  triggerPublishForceCommand,
+  cleanupStaleBuildIdCommand
 ]
