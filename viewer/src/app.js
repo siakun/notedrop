@@ -261,6 +261,10 @@ function round1(n) { return Math.round(n * 10) / 10 }
 
 let pageIndicatorScrollTarget = null
 let pageIndicatorScrollHandler = null
+let pageIndicatorWheelHandler = null
+let pageIndicatorKeyHandler = null
+let snapTimer = null
+let isSnapping = false
 
 function setupPageIndicatorListeners() {
   window.addEventListener('resize', () => requestAnimationFrame(updatePageIndicator))
@@ -334,16 +338,86 @@ function attachScrollListener(el) {
   if (pageIndicatorScrollTarget === el) return
   detachScrollListener()
   pageIndicatorScrollTarget = el
-  pageIndicatorScrollHandler = () => requestAnimationFrame(updatePageIndicator)
+
+  pageIndicatorScrollHandler = () => {
+    requestAnimationFrame(updatePageIndicator)
+    if (isSnapping) return
+    if (snapTimer) clearTimeout(snapTimer)
+    snapTimer = setTimeout(() => snapToPage(el), 180)
+  }
   el.addEventListener('scroll', pageIndicatorScrollHandler, { passive: true })
+
+  // Hijack vertical wheel → horizontal scroll
+  pageIndicatorWheelHandler = (e) => {
+    if (e.shiftKey) return
+    const dy = e.deltaY
+    const dx = e.deltaX
+    if (dy === 0) return
+    if (Math.abs(dy) <= Math.abs(dx)) return  // user is scrolling horizontally explicitly
+    e.preventDefault()
+    el.scrollLeft += dy
+  }
+  el.addEventListener('wheel', pageIndicatorWheelHandler, { passive: false })
+
+  // Keyboard arrow page nav
+  pageIndicatorKeyHandler = (e) => {
+    const layout = document.body.dataset.layout
+    if (layout !== 'horizontal' && layout !== 'two-pages') return
+    if (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return
+    const stride = computePageStride(el)
+    if (!stride) return
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+      e.preventDefault()
+      el.scrollBy({ left: stride, behavior: 'smooth' })
+    } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      e.preventDefault()
+      el.scrollBy({ left: -stride, behavior: 'smooth' })
+    }
+  }
+  document.addEventListener('keydown', pageIndicatorKeyHandler)
 }
 
 function detachScrollListener() {
-  if (pageIndicatorScrollTarget && pageIndicatorScrollHandler) {
-    pageIndicatorScrollTarget.removeEventListener('scroll', pageIndicatorScrollHandler)
+  if (pageIndicatorScrollTarget) {
+    if (pageIndicatorScrollHandler)
+      pageIndicatorScrollTarget.removeEventListener('scroll', pageIndicatorScrollHandler)
+    if (pageIndicatorWheelHandler)
+      pageIndicatorScrollTarget.removeEventListener('wheel', pageIndicatorWheelHandler)
+  }
+  if (pageIndicatorKeyHandler) {
+    document.removeEventListener('keydown', pageIndicatorKeyHandler)
+  }
+  if (snapTimer) {
+    clearTimeout(snapTimer)
+    snapTimer = null
   }
   pageIndicatorScrollTarget = null
   pageIndicatorScrollHandler = null
+  pageIndicatorWheelHandler = null
+  pageIndicatorKeyHandler = null
+}
+
+function computePageStride(scrollEl) {
+  const content = scrollEl.querySelector('.entry-content')
+  if (!content) return 0
+  const cs = getComputedStyle(content)
+  const colW = parseFloat(cs.columnWidth)
+  const colG = parseFloat(cs.columnGap) || 0
+  if (!colW || !isFinite(colW)) return 0
+  const unit = colW + colG
+  const layout = document.body.dataset.layout
+  return layout === 'two-pages' ? unit * 2 : unit
+}
+
+function snapToPage(scrollEl) {
+  if (snapTimer) { clearTimeout(snapTimer); snapTimer = null }
+  const stride = computePageStride(scrollEl)
+  if (!stride) return
+  const target = Math.round(scrollEl.scrollLeft / stride) * stride
+  if (Math.abs(target - scrollEl.scrollLeft) < 2) return
+  isSnapping = true
+  scrollEl.scrollTo({ left: target, behavior: 'smooth' })
+  setTimeout(() => { isSnapping = false }, 400)
 }
 
 function isPreviewHost() {
