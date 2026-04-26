@@ -11,6 +11,14 @@
   --user-line-scale: 1;
   --user-text-align: left;
 
+  --page-width: 210mm;
+  --page-height: 297mm;
+  --page-margin-top: 20mm;
+  --page-margin-bottom: 20mm;
+  --page-margin-left: 25mm;
+  --page-margin-right: 25mm;
+
+  --header-height: 56px;
   --max-width-doc: 720px;
   --max-width-book: 920px;
 
@@ -230,6 +238,128 @@ body {
   letter-spacing: 0.05em;
 }
 
+/* layouts */
+.vs-layouts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.vs-layout {
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1.5px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.75rem 0.5rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: inherit;
+  transition: border-color 0.1s ease, background 0.1s ease;
+}
+
+.vs-layout:hover {
+  border-color: var(--color-accent);
+  background: var(--color-bg-soft);
+}
+
+.vs-layout[aria-checked="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent-hover);
+  background: rgba(35, 131, 226, 0.08);
+}
+
+.vs-layout-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.vs-layout-name {
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+/* page sizes */
+.vs-page-sizes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+}
+
+.vs-page-size {
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.5rem 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: border-color 0.1s ease, background 0.1s ease;
+}
+
+.vs-page-size:hover {
+  border-color: var(--color-accent);
+  background: var(--color-bg-soft);
+}
+
+.vs-page-size[aria-checked="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent-hover);
+  background: rgba(35, 131, 226, 0.08);
+  font-weight: 600;
+}
+
+/* margins */
+.vs-margins {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.vs-margin {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+  background: var(--color-bg);
+}
+
+.vs-margin-icon {
+  color: var(--color-muted);
+  font-size: 0.95rem;
+  width: 1rem;
+  text-align: center;
+}
+
+.vs-margin input {
+  flex: 1;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 0.85rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.vs-margin input:focus {
+  outline: none;
+}
+
+.vs-margin input::-webkit-outer-spin-button,
+.vs-margin input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 /* themes */
 .vs-themes {
   display: grid;
@@ -394,6 +524,116 @@ body {
   max-width: var(--max-width-doc);
   margin: 2rem auto;
   padding: 0 1.5rem;
+}
+
+/* ─── Layout modes ───────────────────────────────────────────────────── */
+
+/* Default = current behavior, no overrides */
+
+/* Vertical Scroll = fixed-width page, content flows vertically */
+body[data-layout="vertical"] .app-shell {
+  max-width: none;
+  margin: 0;
+  padding: 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+body[data-layout="vertical"] .entry-content,
+body[data-layout="vertical"] .app-shell.book article {
+  width: var(--page-width);
+  background: var(--color-bg-elevated);
+  padding: var(--page-margin-top) var(--page-margin-right) var(--page-margin-bottom) var(--page-margin-left);
+  border-radius: 4px;
+  box-shadow: 0 8px 24px var(--color-card-shadow);
+  border: 1px solid var(--color-border);
+}
+
+body[data-layout="vertical"] .app-shell.book {
+  /* allow book TOC + page side by side */
+  display: grid;
+  justify-content: center;
+  grid-template-columns: 240px var(--page-width);
+}
+
+/* Horizontal / Two Pages = horizontal scroll within a viewport-sized shell */
+body[data-layout="horizontal"] .app-shell,
+body[data-layout="two-pages"] .app-shell {
+  max-width: none;
+  margin: 0;
+  padding: 1.5rem;
+  height: calc(100vh - var(--header-height));
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+body[data-layout="horizontal"] .app-shell.book,
+body[data-layout="two-pages"] .app-shell.book {
+  /* Book chapter mode: TOC stays sticky, content scrolls horizontal */
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 1rem;
+}
+
+body[data-layout="horizontal"] .app-shell.book .toc,
+body[data-layout="two-pages"] .app-shell.book .toc {
+  height: 100%;
+  overflow-y: auto;
+}
+
+body[data-layout="horizontal"] .app-shell.book article,
+body[data-layout="two-pages"] .app-shell.book article {
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+body[data-layout="horizontal"] .entry-content,
+body[data-layout="two-pages"] .entry-content {
+  height: 100%;
+  background: var(--color-bg-elevated);
+  padding: var(--page-margin-top) var(--page-margin-right) var(--page-margin-bottom) var(--page-margin-left);
+  border-radius: 4px;
+  box-shadow: 0 8px 24px var(--color-card-shadow);
+  border: 1px solid var(--color-border);
+  column-width: calc(var(--page-width) - var(--page-margin-left) - var(--page-margin-right));
+  column-gap: calc(var(--page-margin-left) + var(--page-margin-right));
+  column-fill: auto;
+  column-rule: 1px solid var(--color-border);
+}
+
+/* In horizontal/two-pages, force entry-content to take width = pages * (col-width + gap) */
+
+/* Hide chapter-nav in book modes (use horizontal scroll instead) */
+body[data-layout="horizontal"] .chapter-nav,
+body[data-layout="two-pages"] .chapter-nav {
+  display: none;
+}
+
+/* Adjust scroll behavior for natural pagination feel */
+body[data-layout="horizontal"] .app-shell,
+body[data-layout="two-pages"] .app-shell {
+  scroll-behavior: smooth;
+}
+
+/* Force entry-content elements not to break weirdly inside columns */
+body[data-layout="horizontal"] .entry-content > *,
+body[data-layout="two-pages"] .entry-content > * {
+  break-inside: avoid;
+}
+
+body[data-layout="horizontal"] .entry-content h1,
+body[data-layout="horizontal"] .entry-content h2,
+body[data-layout="horizontal"] .entry-content h3,
+body[data-layout="two-pages"] .entry-content h1,
+body[data-layout="two-pages"] .entry-content h2,
+body[data-layout="two-pages"] .entry-content h3 {
+  break-after: avoid;
+}
+
+/* ─── Book-only settings sections ────────────────────────────────────── */
+body[data-layout="default"] .vs-book-only {
+  display: none;
 }
 
 .app-shell.book {
@@ -712,3 +952,24 @@ mark {
   padding: 0 0.2em;
   border-radius: 2px;
 }
+
+/* ─── Page indicator (horizontal/two-pages mode) ─────────────────────── */
+.page-indicator {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  padding: 0.45rem 1.1rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  z-index: 50;
+  box-shadow: 0 4px 12px var(--color-card-shadow);
+  user-select: none;
+  letter-spacing: 0.02em;
+}
+
+.page-indicator[hidden] { display: none; }

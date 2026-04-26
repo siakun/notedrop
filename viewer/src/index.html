@@ -18,6 +18,48 @@
     <h3 class="vs-title">보기 설정</h3>
 
     <section class="vs-section">
+      <h4 class="vs-label">레이아웃</h4>
+      <div class="vs-layouts" role="radiogroup">
+        <button class="vs-layout" data-layout-value="default" role="radio" aria-checked="true">
+          <span class="vs-layout-icon" aria-hidden="true">≡</span>
+          <span class="vs-layout-name">Default</span>
+        </button>
+        <button class="vs-layout" data-layout-value="vertical" role="radio" aria-checked="false">
+          <span class="vs-layout-icon" aria-hidden="true">▭</span>
+          <span class="vs-layout-name">Vertical Scroll</span>
+        </button>
+        <button class="vs-layout" data-layout-value="horizontal" role="radio" aria-checked="false">
+          <span class="vs-layout-icon" aria-hidden="true">⇆</span>
+          <span class="vs-layout-name">Horizontal Scroll</span>
+        </button>
+        <button class="vs-layout" data-layout-value="two-pages" role="radio" aria-checked="false">
+          <span class="vs-layout-icon" aria-hidden="true">▭ ▭</span>
+          <span class="vs-layout-name">Two Pages</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="vs-section vs-book-only">
+      <h4 class="vs-label">페이지 크기</h4>
+      <div class="vs-page-sizes" role="radiogroup">
+        <button class="vs-page-size" data-page-size-value="B4" role="radio">B4</button>
+        <button class="vs-page-size" data-page-size-value="A4" role="radio" aria-checked="true">A4</button>
+        <button class="vs-page-size" data-page-size-value="B5" role="radio">B5</button>
+        <button class="vs-page-size" data-page-size-value="A5" role="radio">A5</button>
+      </div>
+    </section>
+
+    <section class="vs-section vs-book-only">
+      <h4 class="vs-label">여백 (mm)</h4>
+      <div class="vs-margins">
+        <label class="vs-margin"><span class="vs-margin-icon">↑</span><input type="number" id="vs-margin-top" min="0" max="60" step="1"></label>
+        <label class="vs-margin"><span class="vs-margin-icon">↓</span><input type="number" id="vs-margin-bottom" min="0" max="60" step="1"></label>
+        <label class="vs-margin"><span class="vs-margin-icon">←</span><input type="number" id="vs-margin-left" min="0" max="60" step="1"></label>
+        <label class="vs-margin"><span class="vs-margin-icon">→</span><input type="number" id="vs-margin-right" min="0" max="60" step="1"></label>
+      </div>
+    </section>
+
+    <section class="vs-section">
       <h4 class="vs-label">테마</h4>
       <div class="vs-themes" role="radiogroup">
         <button class="vs-theme vs-theme-day" data-theme-value="day" role="radio" aria-checked="false">
@@ -78,6 +120,9 @@
   <main id="app" class="app-shell">
     <p class="loading">불러오는 중…</p>
   </main>
+  <div id="page-indicator" class="page-indicator" hidden>
+    <span id="page-current">1</span> / <span id="page-total">1</span>
+  </div>
   <script type="module" src="app.js"></script>
 </body>
 </html>
