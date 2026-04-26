@@ -53,10 +53,6 @@ const origBlockquote = (function findBlockquote() {
 })()
 void origBlockquote
 
-setupViewSettings()
-window.addEventListener('hashchange', render)
-init().catch((err) => showError(err))
-
 async function init() {
   await loadManifest()
   await render()
@@ -457,3 +453,8 @@ function escape(s) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
 }
+
+// Boot — run AFTER all const/function declarations so View Settings consts are initialized
+setupViewSettings()
+window.addEventListener('hashchange', render)
+init().catch((err) => showError(err))
