@@ -140,7 +140,7 @@ describe('createPlanFactory cache 분기', () => {
     expect(plan.files.every((f) => !f.path.endsWith('.nojekyll'))).toBe(true)
   })
 
-  it('cache miss (lastViewerCacheKey null) → viewerCacheHit=false + 전체 unpack', async () => {
+  it('baseline 없음 → viewerCacheHit=false + 전체 unpack (첫 publish 케이스)', async () => {
     settings.lastViewerCacheKey = null
     settings.lastPublishedFiles = null
     const factory = createPlanFactory(
@@ -150,7 +150,7 @@ describe('createPlanFactory cache 분기', () => {
     const plan = await factory()
     expect(plan.viewerCacheHit).toBe(false)
     expect(plan.viewerCacheKey).not.toBeNull()
-    // .nojekyll 가 cache miss 시 plan.files 에 존재 (text kind, content "")
+    // baseline 없음 → 전체 unpack → .nojekyll 가 text kind 로 등록
     const nojekyll = plan.files.find((f) => f.path.endsWith('.nojekyll'))
     expect(nojekyll).toBeDefined()
     expect(nojekyll!.kind).toBe('text')
@@ -158,16 +158,13 @@ describe('createPlanFactory cache 분기', () => {
     expect(plan.files.filter((f) => f.kind === 'cached').length).toBe(0)
   })
 
-  it('cache hit → cached entry 존재 + collectViewerFiles 호출 안 됨', async () => {
+  it('fingerprint match + baseline 있음 → cached entry + viewerCacheHit=true', async () => {
     const segment = 'notedrop-share'
     const cacheKey = buildViewerCacheKey(VIEWER_FINGERPRINT, '', segment)
     settings.lastViewerCacheKey = cacheKey
     settings.lastPublishedFiles = {
-      // viewer 자산 path (.nojekyll, _next/x.js) baseline 에 존재
       '.nojekyll': { hash: 'h-nojekyll', text: '' },
       '_next/static/chunk.js': { hash: 'h-chunk', text: 'console.log(1)' },
-      // 사용자 manifest + content (cached entry 로 안 존재 — orchestrator 가
-      // 매번 fresh 등록)
       'manifest.json': { hash: 'h-manifest', text: '{"v":1}' },
       'content/abc/index.md': { hash: 'h-md', text: '# title' }
     }
@@ -179,7 +176,6 @@ describe('createPlanFactory cache 분기', () => {
     expect(plan.viewerCacheHit).toBe(true)
     expect(plan.viewerCacheKey).toBe(cacheKey)
     const cached = plan.files.filter((f) => f.kind === 'cached')
-    // baseline 의 viewer 자산 (.nojekyll + _next/...) 만 cached
     expect(cached.length).toBe(2)
     expect(cached.some((f) => f.path === '.nojekyll')).toBe(true)
     expect(cached.some((f) => f.path === '_next/static/chunk.js')).toBe(true)
@@ -187,7 +183,32 @@ describe('createPlanFactory cache 분기', () => {
     expect(cached.some((f) => f.path === 'manifest.json')).toBe(false)
   })
 
-  it('force=true → cache hit 키 일치라도 무시 + 전체 unpack', async () => {
+  it('v0.1.46 옵션 B: fingerprint mismatch + baseline 있음 → cached entry + viewerCacheHit=false', async () => {
+    // 옵션 B 의 핵심 케이스 — plugin update 후 일반 publish.
+    // baseline 의 viewer 자산을 cached entry 로 등록하지만 viewerCacheHit=false
+    // 라 publishVault 가 Notice "viewer sync 의무" 띄움.
+    settings.lastViewerCacheKey = 'old-fingerprint|...|notedrop-share'
+    settings.lastPublishedFiles = {
+      '.nojekyll': { hash: 'h-nojekyll', text: '' },
+      '_next/static/old-chunk.js': { hash: 'h-old', text: 'console.log(1)' },
+      'manifest.json': { hash: 'h-manifest', text: '{"v":1}' }
+    }
+    const factory = createPlanFactory(
+      { vault, index, transformer, manifestBuilder },
+      settings
+    )
+    const plan = await factory()
+    expect(plan.viewerCacheHit).toBe(false)
+    expect(plan.viewerCacheKey).not.toBe(settings.lastViewerCacheKey)
+    // baseline 의 viewer 자산은 *여전히* cached entry 로 존재 (push 안 됨)
+    const cached = plan.files.filter((f) => f.kind === 'cached')
+    expect(cached.length).toBe(2)
+    expect(cached.some((f) => f.path === '_next/static/old-chunk.js')).toBe(true)
+    // 새 viewer 자산 unpack 안 함 — collectViewerFiles 호출 0
+    expect(plan.files.some((f) => f.kind === 'text' && f.path.endsWith('.nojekyll'))).toBe(false)
+  })
+
+  it('force=true → cache 무시 + 전체 unpack', async () => {
     const segment = 'notedrop-share'
     const cacheKey = buildViewerCacheKey(VIEWER_FINGERPRINT, '', segment)
     settings.lastViewerCacheKey = cacheKey
@@ -207,13 +228,16 @@ describe('createPlanFactory cache 분기', () => {
     expect(nojekyll?.kind).toBe('text')
   })
 
-  it('cache key mismatch (publicRoot 변경) → cache miss', async () => {
-    const cacheKey = buildViewerCacheKey(VIEWER_FINGERPRINT, '', 'notedrop-share')
-    settings.lastViewerCacheKey = cacheKey
+  it('publicRoot 변경 + baseline 있음 → cached entry (단 viewerCacheHit=false)', async () => {
+    // v0.1.46: cache key mismatch 라도 baseline 의 viewer 자산은 cached
+    // 존재 (push 없음). publicRoot 변경 시 baseline 의 path 가 새 publicRoot
+    // 와 다르면 isViewerAssetPath 의 prefix 가드가 false 분류 → cached
+    // entry 등록 안 함 (sanity 보호).
+    settings.lastViewerCacheKey = buildViewerCacheKey(VIEWER_FINGERPRINT, '', 'notedrop-share')
     settings.lastPublishedFiles = {
-      '.nojekyll': { hash: 'h', text: '' }
+      '.nojekyll': { hash: 'h', text: '' }  // 옛 publicRoot=''
     }
-    settings.publicRoot = 'docs' // 다름
+    settings.publicRoot = 'docs' // 변경
     const factory = createPlanFactory(
       { vault, index, transformer, manifestBuilder },
       settings
@@ -221,9 +245,13 @@ describe('createPlanFactory cache 분기', () => {
     const plan = await factory()
     expect(plan.viewerCacheHit).toBe(false)
     expect(plan.viewerCacheKey).toContain('docs')
+    // baseline 의 .nojekyll 은 publicRoot='' prefix 라 새 publicRoot='docs'
+    // 와 mismatch → isViewerAssetPath false → cached entry 등록 안 함
+    const cached = plan.files.filter((f) => f.kind === 'cached')
+    expect(cached.length).toBe(0)
   })
 
-  it('cache hit + lastPublishedFiles=null → cache miss (sanity)', async () => {
+  it('baseline=null + lastViewerCacheKey 존재 → 전체 unpack (sanity)', async () => {
     const cacheKey = buildViewerCacheKey(VIEWER_FINGERPRINT, '', 'notedrop-share')
     settings.lastViewerCacheKey = cacheKey
     settings.lastPublishedFiles = null
@@ -233,5 +261,7 @@ describe('createPlanFactory cache 분기', () => {
     )
     const plan = await factory()
     expect(plan.viewerCacheHit).toBe(false)
+    // baseline 없음 → cached entry 등록할 source 없음 → 전체 unpack
+    expect(plan.files.filter((f) => f.kind === 'cached').length).toBe(0)
   })
 })

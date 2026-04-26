@@ -69,16 +69,17 @@ export function createPlanFactory(
       const cacheKey = buildViewerCacheKey(VIEWER_FINGERPRINT, settings.publicRoot, segment)
       plan.viewerCacheKey = cacheKey
       const force = options?.force === true
-      const cacheHit = !force
-        && VIEWER_FINGERPRINT !== ''
-        && settings.lastViewerCacheKey === cacheKey
-        && settings.lastPublishedFiles !== null
-      if (cacheHit) {
-        plan.viewerCacheHit = true
-        // baseline 의 viewer 자산 path 만 cached entry 로 등록. manifest +
-        // content 는 orchestrator 가 이미 push (변경 없으면 변경 감지 filter
-        // out, 변경 있으면 push). cached entry 는 hash 만 존재고 변경
-        // 감지 filter 가 변경 없음 분류 → push 안 됨 → base_tree 가 보존.
+      const hasBaseline = settings.lastPublishedFiles !== null
+      // v0.1.46 옵션 B: 일반 publish (force=false + baseline 있음) 는
+      // *항상* baseline 의 viewer 자산을 cached entry 로 등록 (fingerprint
+      // match 무관). viewer 자산의 *push* 는 syncViewerAssets 명령어 책임.
+      // viewerCacheHit = fingerprint match 의미 — Notice 분기용 (mismatch 시
+      // publishVault 가 "viewer sync 의무" Notice).
+      // force publish 또는 첫 publish (baseline 없음) 는 전체 unpack — 의도된
+      // 일괄 push.
+      if (!force && hasBaseline) {
+        plan.viewerCacheHit = VIEWER_FINGERPRINT !== ''
+          && settings.lastViewerCacheKey === cacheKey
         const baseline = settings.lastPublishedFiles!
         for (const [path, snap] of Object.entries(baseline)) {
           if (isViewerAssetPath(path, settings.publicRoot)) {

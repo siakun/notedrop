@@ -141,6 +141,27 @@ summary: dogfood 반복 중 사용자가 직접 지시한 UI/UX 사양·명명 �
 - **사유**: 사용자가 publish 전 검증 흐름을 키보드 (Cmd+P) 만으로 수행 가능해야 함
 - **위치**: `plugin/src/commands/showPublishDiff.ts`
 
+### 13.3.11 Sync viewer assets 명령 (v0.1.46 옵션 B)
+
+- **결정**: 신규 명령 `Notedrop: Sync viewer assets to GitHub`. viewer 자산만 push. 일반 publish 의 시간/UX 와 *명시 분리* — 일반 publish 는 *항상 manifest + content 만* (~5초), viewer 자산 갱신은 사용자 명시 trigger (~68초)
+- **동작**:
+  - VIEWER_FINGERPRINT 와 `settings.lastViewerCacheKey` 비교
+  - 일치 → Notice "변경 없음" + early return (push 없음)
+  - 다름 → `collectViewerFiles()` 전체 unpack → ~144 file 일괄 push → baseline 의 viewer 자산 path 만 갱신 (manifest + content baseline 보존) + `lastViewerCacheKey` 갱신
+- **사유**: 사용자 측정 결과 (postmortem `2026-04-27-publish-efficiency-measurement.md`):
+  - 실제 비효율 = force/첫 publish 의 GitHub Tree API 144 file blob 등록 ~68초
+  - 변경 감지 filter (v0.1.34+) 와 옵션 A (v0.1.45) 가 *push 자산 회피* 효과 부분 — 단 fingerprint mismatch 시 viewer 자산 added 분류 → 일괄 push
+  - 옵션 B 가 *시간 분리* — 사용자가 *언제 68초 비용 발생* 명시 인지
+- **위치**: `plugin/src/commands/syncViewerAssets.ts`
+- **연관**: §13.3.12 (publishVault 의 fingerprint mismatch Notice)
+
+### 13.3.12 일반 publish 의 fingerprint mismatch Notice (v0.1.46)
+
+- **결정**: 일반 `publishVault` 가 *항상 viewer 자산을 cached entry 로 등록* (옵션 A 의 cache hit 분기를 fingerprint match 무관 작동). plan 빌드 후 `viewerCacheHit=false` (= fingerprint mismatch) + viewer 자산 push 없음 인 케이스에 Notice "viewer 자산 갱신 의무 — Sync viewer assets 명령 실행" 띄움
+- **사유**: 사용자가 plugin update 후 일반 publish 만 반복하면 share repo 의 viewer 자산이 *옛 chunk hash* 그대로. UI 깨지지 않지만 새 plugin 의 변경 사항 미반영. Notice 가 명시적 인지 의무
+- **부수 시맨틱**: `lastViewerCacheKey` 의 갱신은 *실 viewer 자산 push 발생 시* 만 — `publishVault.executePublish` 가 `pushedViewerAsset` 분기로 `confirmPublished({ updateViewerCacheKey })` 호출. 즉 settings 의 `lastViewerCacheKey` 가 *실제 share repo 의 viewer 자산 fingerprint* 를 가리킴 (cached entry 만 등록한 publish 가 갱신 X)
+- **위치**: `plugin/src/commands/publishVault.ts` `executePublish` + `plugin/src/services/DirtyTracker.ts` `confirmPublished({ updateViewerCacheKey })`
+
 ## 13.4 발행 영속화 (Persistence)
 
 ### 13.4.1 Hash 형식 = dashed UUID

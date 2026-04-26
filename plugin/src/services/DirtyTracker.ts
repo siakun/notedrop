@@ -72,10 +72,21 @@ export class DirtyTracker {
     return true
   }
 
-  async confirmPublished(snapshot: PlanSnapshot): Promise<void> {
+  /**
+   * v0.1.46 옵션 B: options.updateViewerCacheKey=false 면 lastViewerCacheKey
+   * 등록 안 함. 일반 publish 가 viewer 자산을 cached entry 만 등록하고 실제 push 없음
+   * 인 케이스 (옵션 B) 에서 사용 — settings 의 fingerprint 가 *실제 share
+   * repo 의 viewer 자산 fingerprint* 를 가리키도록 보존.
+   */
+  async confirmPublished(
+    snapshot: PlanSnapshot,
+    options?: { updateViewerCacheKey?: boolean }
+  ): Promise<void> {
     this.settings.lastPublishedDigest = snapshot.digest
     this.settings.lastPublishedFiles = snapshot.files
-    this.settings.lastViewerCacheKey = snapshot.viewerCacheKey
+    if (options?.updateViewerCacheKey !== false) {
+      this.settings.lastViewerCacheKey = snapshot.viewerCacheKey
+    }
     this.settings.unpublishedChanges = false
     await this.saveSettings()
   }

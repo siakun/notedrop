@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config'
 import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 /**
  * src/embedded/* 의 .b64 / .txt / .html / .css 파일을 default text export 로
@@ -25,6 +26,15 @@ const embeddedTextLoader = {
 
 export default defineConfig({
   plugins: [embeddedTextLoader],
+  resolve: {
+    alias: {
+      // obsidian 은 production 빌드 시 esbuild 의 external 로 처리. vitest
+      // 환경에서는 src/__mocks__/obsidian.ts 의 placeholder 로 alias 하여
+      // commands/services 의 Notice/Plugin import 가 vite resolve 단계에서
+      // fail 하지 않도록.
+      obsidian: fileURLToPath(new URL('./src/__mocks__/obsidian.ts', import.meta.url))
+    }
+  },
   test: {
     globals: true,
     passWithNoTests: true,

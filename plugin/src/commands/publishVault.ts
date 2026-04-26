@@ -10,6 +10,7 @@ import {
 } from '../infrastructure/GitHubPublisher.js'
 import type { PluginContext } from '../services/PluginContext.js'
 import type { PlanFactory } from '../services/PlanFactory.js'
+import { isViewerAssetPath } from '../services/PlanFactory.js'
 import type { DirtyTracker } from '../services/DirtyTracker.js'
 import type { Logger } from '../services/Logger.js'
 import type { CommandDef } from './types.js'
@@ -25,7 +26,16 @@ export type PublishDeps = {
   buildPlan: PlanFactory
   dirtyTracker: DirtyTracker
   logger: Logger
-  onPublishSuccess?: (options?: { force?: boolean }) => Promise<void>
+  /**
+   * publish 성공 후 baseline 갱신 hook. v0.1.46 옵션 B: pushedViewerAsset
+   * 이 false 면 lastViewerCacheKey 갱신 안 함 (일반 publish 의 cached entry
+   * 케이스 — 실 viewer 자산 push 없음). syncViewerAssets 또는 force publish
+   * 만 lastViewerCacheKey 갱신.
+   */
+  onPublishSuccess?: (options?: {
+    force?: boolean
+    updateViewerCacheKey?: boolean
+  }) => Promise<void>
   /**
    * true 면 변경 감지 (lastPublishedFiles 비교) 우회 + plan.files 전체
    * push. forcePublishVault 가 사용. 일반 publishVault 는 false.
@@ -81,7 +91,9 @@ export function buildPublishDeps(ctx: PluginContext): PublishDeps {
       const snapshot = await ctx.dirtyTracker.computeSnapshot({
         force: options?.force === true
       })
-      await ctx.dirtyTracker.confirmPublished(snapshot)
+      await ctx.dirtyTracker.confirmPublished(snapshot, {
+        updateViewerCacheKey: options?.updateViewerCacheKey ?? true
+      })
     }
   }
 }
@@ -258,12 +270,39 @@ export async function executePublish(
       `notedrop: 발행 완료${initSuffix} (commit ${outcome.commitSha.slice(0, 7)}, ${outcome.changedFiles}개 파일)`,
       8000
     )
+    // v0.1.46 옵션 B: 실 viewer 자산이 push 됐는지 (cached entry 가 아니면)
+    // 결정. lastViewerCacheKey 갱신 여부 분기.
+    const pushedViewerAsset = plan.files.some(
+      (f) => f.kind !== 'cached' && isViewerAssetPath(f.path, settings.publicRoot)
+    )
     if (deps.onPublishSuccess) {
       try {
-        await deps.onPublishSuccess({ force })
+        await deps.onPublishSuccess({
+          force,
+          updateViewerCacheKey: pushedViewerAsset
+        })
       } catch (cbErr) {
         console.warn('onPublishSuccess hook 실패', cbErr)
       }
+    }
+    // v0.1.46 옵션 B: fingerprint mismatch + viewer 자산 push 안 한 케이스
+    // (= 일반 publish 의 cached entry 동작) → 사용자에게 sync 명령어 안내.
+    // force publish 는 일괄 push 했으니 mismatch 해소 — Notice 안 띄움.
+    if (
+      !force
+      && !pushedViewerAsset
+      && settings.publishViewerAssets
+      && plan.viewerCacheKey !== null
+      && settings.lastViewerCacheKey !== plan.viewerCacheKey
+    ) {
+      new Notice(
+        'notedrop: viewer 자산 갱신 의무 — Cmd+P 의 "Sync viewer assets" 명령어 실행',
+        12000
+      )
+      deps.logger.info('publish', 'viewer fingerprint mismatch — sync 의무 안내', {
+        currentFingerprint: plan.viewerCacheKey,
+        baselineFingerprint: settings.lastViewerCacheKey
+      })
     }
     if (plan.warnings.length > 0) {
       console.warn('notedrop: warnings', plan.warnings)

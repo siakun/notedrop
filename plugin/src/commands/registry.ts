@@ -4,6 +4,7 @@ import { openSharedListCommand } from './openSharedList.js'
 import { copyShareUrlCommand } from './copyShareUrl.js'
 import { publishVaultCommand } from './publishVault.js'
 import { forcePublishVaultCommand } from './forcePublishVault.js'
+import { syncViewerAssetsCommand } from './syncViewerAssets.js'
 import { resetPublishBaselineCommand } from './resetPublishBaseline.js'
 import {
   openPreviewCommand,
@@ -21,6 +22,7 @@ export const COMMAND_REGISTRY: readonly CommandDef[] = [
   unshareNoteCommand,
   publishVaultCommand,
   forcePublishVaultCommand,
+  syncViewerAssetsCommand,
   resetPublishBaselineCommand,
   startPreviewCommand,
   stopPreviewCommand,

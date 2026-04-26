@@ -101,6 +101,28 @@ describe('DirtyTracker cached kind handling (v0.1.45)', () => {
     expect(saveCalls).toBeGreaterThan(0)
   })
 
+  it('confirmPublished updateViewerCacheKey=false → lastViewerCacheKey 갱신 안 함 (v0.1.46 옵션 B)', async () => {
+    const settings = makeSettings({ lastViewerCacheKey: 'old-key' })
+    const tracker = new DirtyTracker(
+      async () => makePlan([], 'new-key', false),
+      settings,
+      saveSettings
+    )
+    await tracker.confirmPublished(
+      {
+        digest: 'd',
+        files: { 'x.txt': { hash: 'h', text: 'x' } },
+        viewerCacheKey: 'new-key'
+      },
+      { updateViewerCacheKey: false }
+    )
+    // lastViewerCacheKey 는 옛 값 그대로 (실 viewer 자산 push 안 함 케이스)
+    expect(settings.lastViewerCacheKey).toBe('old-key')
+    // 단 digest + files + unpublishedChanges 는 갱신
+    expect(settings.lastPublishedDigest).toBe('d')
+    expect(settings.unpublishedChanges).toBe(false)
+  })
+
   it('computeSnapshot force option 이 buildPlan 에 전파', async () => {
     const settings = makeSettings()
     const buildPlan = vi.fn(async (opts?: { force?: boolean }) =>
