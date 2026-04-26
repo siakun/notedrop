@@ -160,8 +160,11 @@ export class PreviewServer {
     if (contentMatch) {
       const hash = contentMatch[1]!
       const plan = await this.orchestrator.plan()
+      const suffix = `content/${hash}/index.md`
       const file = plan.files.find(
-        (f) => f.kind === 'text' && f.path.endsWith(`/content/${hash}/index.md`)
+        (f) =>
+          f.kind === 'text' &&
+          (f.path === suffix || f.path.endsWith(`/${suffix}`))
       )
       if (!file || file.kind !== 'text') {
         return send(res, 404, 'text/plain; charset=utf-8', `not found: ${hash}`)
@@ -174,10 +177,11 @@ export class PreviewServer {
       const hash = assetMatch[1]!
       const basename = assetMatch[2]!
       const plan = await this.orchestrator.plan()
+      const suffix = `content/${hash}/_assets/${basename}`
       const file = plan.files.find(
         (f) =>
           f.kind === 'binary' &&
-          f.path.endsWith(`/content/${hash}/_assets/${basename}`)
+          (f.path === suffix || f.path.endsWith(`/${suffix}`))
       )
       if (!file || file.kind !== 'binary') {
         return send(res, 404, 'text/plain; charset=utf-8', `asset not found`)
