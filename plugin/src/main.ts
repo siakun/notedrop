@@ -56,7 +56,7 @@ export default class NotedropPlugin extends Plugin {
     )
     const bookAssembler = new BookAssembler(this.vault, this.meta)
     this.bridge = new VaultEventBridge(this.meta, this.index)
-    this.preview = new PreviewServer(this.orchestrator, this.vault, {
+    this.preview = new PreviewServer(this.orchestrator, this.vault, this.index, {
       port: this.settings.previewPort
     })
 
