@@ -5,6 +5,7 @@ import { fakeFingerprintCommand } from './fakeFingerprint.js'
 import { resetBaselineCommand } from './resetBaseline.js'
 import { exportBaselineCommand } from './exportBaseline.js'
 import { dumpLogTailCommand } from './dumpLogTail.js'
+import { triggerPublishSmartCommand, triggerPublishForceCommand } from './triggerPublishWithTrace.js'
 
 /**
  * Dogfood 명령 — debugMode==true 시만 등록.
@@ -21,5 +22,7 @@ export const DOGFOOD_COMMAND_REGISTRY: readonly CommandDef[] = [
   fakeFingerprintCommand,
   resetBaselineCommand,
   exportBaselineCommand,
-  dumpLogTailCommand
+  dumpLogTailCommand,
+  triggerPublishSmartCommand,
+  triggerPublishForceCommand
 ]

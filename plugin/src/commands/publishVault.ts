@@ -77,6 +77,16 @@ export const publishVaultCommand: CommandDef = {
 }
 
 /**
+ * PluginContext 기반 smart publish 래퍼 — dogfood/triggerPublishWithTrace 에서
+ * ctx 만 받는 단일 인자 호출 가능하도록 분리.
+ */
+export async function publishVaultFromCtx(ctx: PluginContext): Promise<void> {
+  await publishVault(buildPublishDeps(ctx), ctx.settings, {
+    isDirty: () => ctx.dirtyTracker.revalidate()
+  })
+}
+
+/**
  * commands 가 PluginContext 에서 publish 의존을 추출하는 헬퍼.
  */
 export function buildPublishDeps(ctx: PluginContext): PublishDeps {

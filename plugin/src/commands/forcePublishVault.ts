@@ -6,6 +6,7 @@ import {
   type PublishDeps
 } from './publishVault.js'
 import type { CommandDef } from './types.js'
+import type { PluginContext } from '../services/PluginContext.js'
 
 /**
  * Force publish — dirty 게이트 우회. 변경 없어도 무조건 publish.
@@ -29,4 +30,12 @@ export const forcePublishVaultCommand: CommandDef = {
   id: 'force-publish-vault',
   name: 'Force publish vault to GitHub (변경 없어도 강제)',
   callback: (ctx) => forcePublishVault(buildPublishDeps(ctx), ctx.settings)
+}
+
+/**
+ * PluginContext 기반 force publish 래퍼 — dogfood/triggerPublishWithTrace 에서
+ * ctx 만 받는 단일 인자 호출 가능하도록 분리.
+ */
+export async function forcePublishVaultFromCtx(ctx: PluginContext): Promise<void> {
+  await forcePublishVault(buildPublishDeps(ctx), ctx.settings)
 }
