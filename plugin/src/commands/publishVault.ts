@@ -25,6 +25,7 @@ export type PublishDeps = {
   index: PublishIndex
   transformer: ContentTransformer
   manifestBuilder: ManifestBuilder
+  onPublishSuccess?: () => Promise<void>
 }
 
 export async function publishVault(
@@ -79,6 +80,11 @@ export async function publishVault(
       `notedrop: 발행 완료${initSuffix} (commit ${outcome.commitSha.slice(0, 7)}, ${outcome.changedFiles}개 파일)`,
       8000
     )
+    if (deps.onPublishSuccess) {
+      try { await deps.onPublishSuccess() } catch (cbErr) {
+        console.warn('onPublishSuccess hook 실패', cbErr)
+      }
+    }
     if (plan.warnings.length > 0) {
       console.warn('notedrop: warnings', plan.warnings)
       new Notice(`notedrop: ${plan.warnings.length}건 경고 (콘솔 확인)`, 6000)

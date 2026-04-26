@@ -1,6 +1,7 @@
 import { PluginSettingTab, Setting } from 'obsidian'
 import type { App } from 'obsidian'
 import type NotedropPlugin from '../main.js'
+import { deriveShareUrlBase } from './shareUrl.js'
 
 export class NotedropSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: NotedropPlugin) {
@@ -15,6 +16,37 @@ export class NotedropSettingTab extends PluginSettingTab {
     containerEl.createEl('p', {
       text: '선택한 노트를 GitHub Pages 정적 뷰어로 발행합니다. 알파 단계 (BRAT) 입니다.'
     })
+
+    const dirty = this.plugin.hasUnpublishedChanges()
+    const indexCount = this.plugin.indexList().length
+    const canPublish = dirty && indexCount > 0
+      && Boolean(this.plugin.settings.githubPat)
+      && Boolean(this.plugin.settings.targetRepo)
+    new Setting(containerEl)
+      .setName('Publish to GitHub')
+      .setDesc(
+        indexCount === 0
+          ? '공유된 노트가 없습니다. 노트 frontmatter 에 notedrop-publish: true 추가 후 발행 가능.'
+          : !this.plugin.settings.githubPat || !this.plugin.settings.targetRepo
+            ? 'PAT 와 target repository 가 필요합니다 (위 항목 입력 후 활성화).'
+            : dirty
+              ? `변경 사항 있음 (${indexCount}개 항목). 클릭하면 GitHub 에 push.`
+              : `최신 상태 (${indexCount}개 항목 발행됨). 변경이 생기면 다시 활성화됩니다.`
+      )
+      .addButton((btn) => {
+        btn.setButtonText(dirty ? '발행' : '발행됨')
+        if (canPublish) btn.setCta()
+        else btn.setDisabled(true)
+        btn.onClick(async () => {
+          btn.setDisabled(true)
+          btn.setButtonText('발행 중…')
+          try {
+            await this.plugin.runPublish()
+          } finally {
+            this.display()
+          }
+        })
+      })
 
     new Setting(containerEl)
       .setName('GitHub PAT')
@@ -81,12 +113,17 @@ export class NotedropSettingTab extends PluginSettingTab {
           })
       )
 
+    const derivedShareBase = deriveShareUrlBase(this.plugin.settings.targetRepo)
     new Setting(containerEl)
-      .setName('Share URL base')
-      .setDesc('GitHub Pages URL (예: https://siakun.github.io/notedrop-share). github.com 소스 URL 아님. Copy share URL 명령어가 base + /#/<hash>/ 형식으로 생성.')
+      .setName('Share URL base (선택)')
+      .setDesc(
+        derivedShareBase
+          ? `비워두면 target repo 기준 자동: ${derivedShareBase}. 커스텀 도메인 (CNAME) 쓸 때만 입력.`
+          : 'target repo 가 정해지면 자동 도출됩니다. 커스텀 도메인이면 직접 입력.'
+      )
       .addText((text) =>
         text
-          .setPlaceholder('https://siakun.github.io/notedrop-share')
+          .setPlaceholder(derivedShareBase || 'https://blog.example.com')
           .setValue(this.plugin.settings.shareUrlBase)
           .onChange(async (value) => {
             this.plugin.settings.shareUrlBase = value.trim().replace(/\/$/, '')
