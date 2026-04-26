@@ -53,6 +53,7 @@ const origBlockquote = (function findBlockquote() {
 })()
 void origBlockquote
 
+setupViewSettings()
 window.addEventListener('hashchange', render)
 init().catch((err) => showError(err))
 
@@ -61,6 +62,138 @@ async function init() {
   await render()
   if (isPreviewHost()) connectLiveReload()
 }
+
+/* ─── View Settings (theme/font/size/spacing/align) ─────────────────── */
+
+const VS_KEY = 'notedrop:viewSettings'
+const VS_DEFAULTS = {
+  theme: 'night',
+  font: 'system',
+  fontScale: 1,
+  lineScale: 1,
+  align: 'left'
+}
+
+const FONT_STACKS = {
+  system: 'inherit',
+  arial: '"Arial", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif',
+  georgia: '"Georgia", "Apple SD Gothic Neo", "Malgun Gothic", serif',
+  times: '"Times New Roman", "Apple SD Gothic Neo", "Malgun Gothic", serif',
+  trebuchet: '"Trebuchet MS", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif',
+  verdana: '"Verdana", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif',
+  'serif-kr': '"Noto Serif KR", "Apple SD Gothic Neo", "Malgun Gothic", serif',
+  'sans-kr': '"Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif'
+}
+
+const FONT_STEP = 0.1
+const FONT_MIN = 0.7
+const FONT_MAX = 1.6
+const LINE_STEP = 0.1
+const LINE_MIN = 0.8
+const LINE_MAX = 1.6
+
+function loadViewSettings() {
+  try {
+    const raw = localStorage.getItem(VS_KEY)
+    if (!raw) return { ...VS_DEFAULTS }
+    const parsed = JSON.parse(raw)
+    return { ...VS_DEFAULTS, ...parsed }
+  } catch { return { ...VS_DEFAULTS } }
+}
+
+function saveViewSettings(s) {
+  try { localStorage.setItem(VS_KEY, JSON.stringify(s)) } catch {}
+}
+
+function applyViewSettings(s) {
+  document.documentElement.dataset.theme = s.theme
+  const root = document.documentElement.style
+  root.setProperty('--user-font-stack', FONT_STACKS[s.font] ?? 'inherit')
+  root.setProperty('--user-font-scale', String(s.fontScale))
+  root.setProperty('--user-line-scale', String(s.lineScale))
+  root.setProperty('--user-text-align', s.align)
+}
+
+function setupViewSettings() {
+  const settings = loadViewSettings()
+  applyViewSettings(settings)
+
+  const btn = document.getElementById('view-settings-toggle')
+  const panel = document.getElementById('view-settings-panel')
+  if (!btn || !panel) return
+
+  const open = () => {
+    panel.hidden = false
+    btn.setAttribute('aria-expanded', 'true')
+    document.addEventListener('mousedown', onOutside)
+  }
+  const close = () => {
+    panel.hidden = true
+    btn.setAttribute('aria-expanded', 'false')
+    document.removeEventListener('mousedown', onOutside)
+  }
+  const onOutside = (e) => {
+    if (panel.contains(e.target) || btn.contains(e.target)) return
+    close()
+  }
+  btn.addEventListener('click', () => {
+    if (panel.hidden) open(); else close()
+  })
+
+  for (const themeBtn of panel.querySelectorAll('[data-theme-value]')) {
+    themeBtn.addEventListener('click', () => {
+      settings.theme = themeBtn.dataset.themeValue
+      apply()
+    })
+  }
+
+  const fontSelect = panel.querySelector('#vs-font')
+  fontSelect.addEventListener('change', () => {
+    settings.font = fontSelect.value
+    apply()
+  })
+
+  for (const stepBtn of panel.querySelectorAll('[data-action]')) {
+    stepBtn.addEventListener('click', () => {
+      const action = stepBtn.dataset.action
+      if (action === 'font-down') settings.fontScale = clamp(round1(settings.fontScale - FONT_STEP), FONT_MIN, FONT_MAX)
+      else if (action === 'font-up') settings.fontScale = clamp(round1(settings.fontScale + FONT_STEP), FONT_MIN, FONT_MAX)
+      else if (action === 'line-down') settings.lineScale = clamp(round1(settings.lineScale - LINE_STEP), LINE_MIN, LINE_MAX)
+      else if (action === 'line-up') settings.lineScale = clamp(round1(settings.lineScale + LINE_STEP), LINE_MIN, LINE_MAX)
+      apply()
+    })
+  }
+
+  for (const alignBtn of panel.querySelectorAll('[data-align-value]')) {
+    alignBtn.addEventListener('click', () => {
+      settings.align = alignBtn.dataset.alignValue
+      apply()
+    })
+  }
+
+  function apply() {
+    saveViewSettings(settings)
+    applyViewSettings(settings)
+    refreshUi()
+  }
+
+  function refreshUi() {
+    for (const themeBtn of panel.querySelectorAll('[data-theme-value]')) {
+      themeBtn.setAttribute('aria-checked', String(themeBtn.dataset.themeValue === settings.theme))
+    }
+    fontSelect.value = settings.font
+    panel.querySelector('#vs-font-pct').textContent = `${Math.round(settings.fontScale * 100)}%`
+    panel.querySelector('#vs-line-pct').textContent = `${Math.round(settings.lineScale * 100)}%`
+    for (const alignBtn of panel.querySelectorAll('[data-align-value]')) {
+      alignBtn.setAttribute('aria-checked', String(alignBtn.dataset.alignValue === settings.align))
+    }
+  }
+
+  refreshUi()
+}
+
+function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)) }
+function round1(n) { return Math.round(n * 10) / 10 }
 
 function isPreviewHost() {
   const h = location.hostname

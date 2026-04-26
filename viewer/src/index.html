@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-theme="night">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,7 +10,71 @@
   <header class="site-header">
     <a href="#/" class="brand">notedrop</a>
     <nav id="crumbs"></nav>
+    <button id="view-settings-toggle" class="view-settings-btn" aria-label="View settings" aria-haspopup="true" aria-expanded="false">
+      <span class="aA-icon" aria-hidden="true"><span class="aA-small">A</span><span class="aA-large">A</span></span>
+    </button>
   </header>
+  <div id="view-settings-panel" class="view-settings-panel" hidden>
+    <h3 class="vs-title">보기 설정</h3>
+
+    <section class="vs-section">
+      <h4 class="vs-label">테마</h4>
+      <div class="vs-themes" role="radiogroup">
+        <button class="vs-theme vs-theme-day" data-theme-value="day" role="radio" aria-checked="false">
+          <span class="vs-theme-swatch">Aa</span>
+          <span class="vs-theme-name">Day</span>
+        </button>
+        <button class="vs-theme vs-theme-sepia" data-theme-value="sepia" role="radio" aria-checked="false">
+          <span class="vs-theme-swatch">Aa</span>
+          <span class="vs-theme-name">Sepia</span>
+        </button>
+        <button class="vs-theme vs-theme-night" data-theme-value="night" role="radio" aria-checked="true">
+          <span class="vs-theme-swatch">Aa</span>
+          <span class="vs-theme-name">Night</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="vs-section">
+      <h4 class="vs-label">글꼴</h4>
+      <select id="vs-font" class="vs-select">
+        <option value="system">원본</option>
+        <option value="arial">Arial</option>
+        <option value="georgia">Georgia</option>
+        <option value="times">Times New Roman</option>
+        <option value="trebuchet">Trebuchet MS</option>
+        <option value="verdana">Verdana</option>
+        <option value="serif-kr">본명조 (Noto Serif KR)</option>
+        <option value="sans-kr">본고딕 (Noto Sans KR)</option>
+      </select>
+    </section>
+
+    <section class="vs-section">
+      <h4 class="vs-label">글꼴 크기</h4>
+      <div class="vs-stepper">
+        <button class="vs-step-btn" data-action="font-down" title="작게"><span aria-hidden="true">T−</span></button>
+        <span id="vs-font-pct" class="vs-step-value">100%</span>
+        <button class="vs-step-btn" data-action="font-up" title="크게"><span aria-hidden="true">T+</span></button>
+      </div>
+    </section>
+
+    <section class="vs-section">
+      <h4 class="vs-label">행 간격</h4>
+      <div class="vs-stepper">
+        <button class="vs-step-btn" data-action="line-down" title="줄이기"><span aria-hidden="true">↕−</span></button>
+        <span id="vs-line-pct" class="vs-step-value">100%</span>
+        <button class="vs-step-btn" data-action="line-up" title="늘리기"><span aria-hidden="true">↕+</span></button>
+      </div>
+    </section>
+
+    <section class="vs-section">
+      <h4 class="vs-label">정렬</h4>
+      <div class="vs-aligns" role="radiogroup">
+        <button class="vs-align" data-align-value="left" role="radio" aria-checked="true">왼쪽</button>
+        <button class="vs-align" data-align-value="justify" role="radio" aria-checked="false">양쪽</button>
+      </div>
+    </section>
+  </div>
   <main id="app" class="app-shell">
     <p class="loading">불러오는 중…</p>
   </main>
