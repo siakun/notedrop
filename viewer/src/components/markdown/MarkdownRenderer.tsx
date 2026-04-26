@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fixAssetPaths, renderMarkdownToHtml } from '@/markdown-pipeline'
 
 let mermaidPromise: Promise<typeof import('mermaid').default> | null = null
@@ -63,7 +63,13 @@ export default function MarkdownRenderer({
 }: MarkdownRendererProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<Error | null>(null)
-  const cacheKey = useMemo(() => body, [body])
+  // Hold the latest onContentReady in a ref so the effect doesn't re-run when the
+  // parent passes a fresh closure on every render. Without this the effect deps
+  // would invalidate every parent render and re-parse markdown indefinitely.
+  const onReadyRef = useRef(onContentReady)
+  useEffect(() => {
+    onReadyRef.current = onContentReady
+  }, [onContentReady])
 
   useEffect(() => {
     let cancelled = false
@@ -71,7 +77,7 @@ export default function MarkdownRenderer({
     if (!node) return
     setError(null)
     node.innerHTML = ''
-    renderMarkdownToHtml(cacheKey)
+    renderMarkdownToHtml(body)
       .then((html) => {
         if (cancelled || !ref.current) return
         ref.current.innerHTML = fixAssetPaths(html, pageHash ?? '')
@@ -79,7 +85,8 @@ export default function MarkdownRenderer({
       })
       .then(() => {
         if (cancelled || !ref.current) return
-        if (onContentReady) onContentReady(ref.current)
+        const cb = onReadyRef.current
+        if (cb) cb(ref.current)
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -88,7 +95,7 @@ export default function MarkdownRenderer({
     return () => {
       cancelled = true
     }
-  }, [cacheKey, pageHash, onContentReady])
+  }, [body, pageHash])
 
   if (error) {
     return (
