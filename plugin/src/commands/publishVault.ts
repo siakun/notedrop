@@ -14,10 +14,13 @@ import {
   GitHubAuthError,
   GitHubApiError
 } from '../infrastructure/GitHubPublisher.js'
+import { unzipSync } from 'fflate'
 
-import indexHtml from '../embedded/index.html'
-import appJs from '../embedded/app.js.txt'
-import styleCss from '../embedded/style.css'
+import viewerZipB64 from '../embedded/viewer.zip.b64'
+
+const TEXT_EXTENSIONS = new Set([
+  'html', 'htm', 'css', 'js', 'mjs', 'json', 'txt', 'md', 'svg', 'xml', 'map'
+])
 
 export type PublishDeps = {
   app: App
@@ -106,12 +109,57 @@ export async function publishVault(
 function collectViewerFiles(publicRoot: string): PublishedFile[] {
   const root = publicRoot.trim().replace(/^\/|\/$/g, '')
   const prefix = root === '' ? '' : `${root}/`
-  return [
-    { kind: 'text', path: `${prefix}.nojekyll`, content: '' },
-    { kind: 'text', path: `${prefix}index.html`, content: indexHtml },
-    { kind: 'text', path: `${prefix}app.js`, content: appJs },
-    { kind: 'text', path: `${prefix}style.css`, content: styleCss }
+  const files: PublishedFile[] = [
+    { kind: 'text', path: `${prefix}.nojekyll`, content: '' }
   ]
+  const entries = unpackViewerZip(viewerZipB64)
+  if (entries.size === 0) {
+    console.warn('notedrop publishVault: viewer.zip 비어 있음 — viewer 자산 미포함')
+    return files
+  }
+  const decoder = new TextDecoder('utf-8')
+  for (const [path, bytes] of entries) {
+    const ext = path.split('.').pop()?.toLowerCase() ?? ''
+    if (TEXT_EXTENSIONS.has(ext)) {
+      files.push({ kind: 'text', path: `${prefix}${path}`, content: decoder.decode(bytes) })
+    } else {
+      files.push({ kind: 'binary', path: `${prefix}${path}`, content: bytes })
+    }
+  }
+  return files
+}
+
+function unpackViewerZip(b64: string): Map<string, Uint8Array> {
+  const out = new Map<string, Uint8Array>()
+  if (!b64 || !b64.trim()) return out
+  let bytes: Uint8Array
+  try {
+    bytes = base64ToBytes(b64.trim())
+  } catch (err) {
+    console.warn('notedrop publishVault: viewer.zip base64 decode 실패', err)
+    return out
+  }
+  let entries: Record<string, Uint8Array>
+  try {
+    entries = unzipSync(bytes)
+  } catch (err) {
+    console.warn('notedrop publishVault: viewer.zip 압축 해제 실패', err)
+    return out
+  }
+  for (const [path, content] of Object.entries(entries)) {
+    out.set(path, content)
+  }
+  return out
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  if (typeof Buffer !== 'undefined') {
+    return new Uint8Array(Buffer.from(b64, 'base64'))
+  }
+  const binary = atob(b64)
+  const result = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) result[i] = binary.charCodeAt(i)
+  return result
 }
 
 function hintFor(status: number): string {
