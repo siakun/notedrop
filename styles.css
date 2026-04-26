@@ -1,1 +1,227 @@
 /* notedrop plugin styles */
+
+/* ─── Publish diff modal ──────────────────────────────────────────────── */
+
+.notedrop-diff-modal {
+  width: min(92vw, 1400px);
+  max-width: 92vw;
+  height: min(90vh, 900px);
+  max-height: 90vh;
+}
+
+.notedrop-diff-modal .modal-content {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.notedrop-diff-loading,
+.notedrop-diff-empty {
+  padding: 2rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.notedrop-diff-banner {
+  background: var(--background-modifier-info);
+  color: var(--text-on-accent);
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+}
+
+.notedrop-diff-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  height: 100%;
+  min-height: 0;
+}
+
+.notedrop-diff-sidebar {
+  border-right: 1px solid var(--background-modifier-border);
+  overflow-y: auto;
+  background: var(--background-secondary);
+}
+
+.notedrop-diff-sidebar-header {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.notedrop-diff-file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.notedrop-diff-file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-normal);
+  border-bottom: 1px solid var(--background-modifier-border-hover);
+}
+
+.notedrop-diff-file:hover {
+  background: var(--background-modifier-hover);
+}
+
+.notedrop-diff-file.is-active {
+  background: var(--background-modifier-active-hover);
+}
+
+.notedrop-diff-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-monospace);
+  font-size: 0.78rem;
+}
+
+.notedrop-diff-status {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: var(--font-monospace);
+}
+
+.notedrop-diff-status-added {
+  background: rgba(34, 197, 94, 0.18);
+  color: rgb(34, 197, 94);
+}
+
+.notedrop-diff-status-modified {
+  background: rgba(234, 179, 8, 0.18);
+  color: rgb(234, 179, 8);
+}
+
+.notedrop-diff-status-removed {
+  background: rgba(239, 68, 68, 0.18);
+  color: rgb(239, 68, 68);
+}
+
+.notedrop-diff-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--background-primary);
+}
+
+.notedrop-diff-main-header {
+  padding: 0.75rem 1rem;
+  font-family: var(--font-monospace);
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+.notedrop-diff-content {
+  overflow: auto;
+  flex: 1;
+  font-family: var(--font-monospace);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.notedrop-diff-binary {
+  padding: 2rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.notedrop-diff-hunk {
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.notedrop-diff-hunk-header {
+  padding: 0.25rem 0.75rem;
+  background: var(--background-modifier-form-field);
+  color: var(--text-accent);
+  font-family: var(--font-monospace);
+  font-size: 0.78rem;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.notedrop-diff-rows {
+  display: block;
+}
+
+.notedrop-diff-row {
+  display: grid;
+  grid-template-columns: 48px 18px 1fr 48px 18px 1fr;
+  align-items: stretch;
+  font-family: var(--font-monospace);
+  white-space: pre;
+  word-break: keep-all;
+}
+
+.notedrop-diff-lineno {
+  color: var(--text-faint);
+  text-align: right;
+  padding: 0 8px;
+  user-select: none;
+  border-right: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+.notedrop-diff-sign {
+  text-align: center;
+  user-select: none;
+  color: var(--text-faint);
+  padding: 0 2px;
+}
+
+.notedrop-diff-sign-added {
+  color: rgb(34, 197, 94);
+  background: rgba(34, 197, 94, 0.15);
+}
+
+.notedrop-diff-sign-removed {
+  color: rgb(239, 68, 68);
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.notedrop-diff-code {
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.notedrop-diff-code-added {
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.notedrop-diff-code-removed {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.notedrop-diff-word-added {
+  background: rgba(34, 197, 94, 0.4);
+  border-radius: 2px;
+}
+
+.notedrop-diff-word-removed {
+  background: rgba(239, 68, 68, 0.4);
+  border-radius: 2px;
+}
+
+.notedrop-diff-row-modified .notedrop-diff-code:nth-of-type(1),
+.notedrop-diff-row-modified .notedrop-diff-code:nth-of-type(2) {
+  /* the cells already have code-removed/code-added classes */
+}

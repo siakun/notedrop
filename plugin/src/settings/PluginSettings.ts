@@ -1,5 +1,10 @@
 import type { SeedEntry } from '../domain/PublishIndex.js'
 
+export type PublishedFileSnapshot = {
+  hash: string
+  text: string | null
+}
+
 export type PluginSettings = {
   githubPat: string
   targetRepo: string
@@ -12,7 +17,7 @@ export type PluginSettings = {
   publishedSeeds: SeedEntry[]
   unpublishedChanges: boolean
   lastPublishedDigest: string | null
-  lastPublishedFileHashes: Record<string, string> | null
+  lastPublishedFiles: Record<string, PublishedFileSnapshot> | null
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -27,5 +32,5 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   publishedSeeds: [],
   unpublishedChanges: true,
   lastPublishedDigest: null,
-  lastPublishedFileHashes: null
+  lastPublishedFiles: null
 }

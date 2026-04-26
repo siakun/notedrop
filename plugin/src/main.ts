@@ -12,7 +12,8 @@ import { ManifestBuilder } from './domain/ManifestBuilder.js'
 import { PublishOrchestrator } from './domain/PublishOrchestrator.js'
 import {
   DEFAULT_SETTINGS,
-  type PluginSettings
+  type PluginSettings,
+  type PublishedFileSnapshot
 } from './settings/PluginSettings.js'
 import { NotedropSettingTab } from './settings/SettingsTab.js'
 import { shareNote } from './commands/shareNote.js'
@@ -186,7 +187,7 @@ export default class NotedropPlugin extends Plugin {
         onPublishSuccess: async () => {
           const snapshot = await this.computePlanSnapshot()
           this.settings.lastPublishedDigest = snapshot.digest
-          this.settings.lastPublishedFileHashes = snapshot.fileHashes
+          this.settings.lastPublishedFiles = snapshot.files
           this.settings.unpublishedChanges = false
           await this.saveSettings()
         }
@@ -213,11 +214,11 @@ export default class NotedropPlugin extends Plugin {
 
   async computePlanSnapshot(): Promise<{
     digest: string
-    fileHashes: Record<string, string>
+    files: Record<string, PublishedFileSnapshot>
   }> {
     const plan = await this.orchestrator.plan()
     const hash = crypto.createHash('sha256')
-    const fileHashes: Record<string, string> = {}
+    const files: Record<string, PublishedFileSnapshot> = {}
     const sorted = [...plan.files].sort((a, b) => a.path.localeCompare(b.path))
     for (const file of sorted) {
       const fileSha = crypto.createHash('sha256')
@@ -226,13 +227,17 @@ export default class NotedropPlugin extends Plugin {
       } else {
         fileSha.update(Buffer.from(file.content))
       }
-      fileHashes[file.path] = fileSha.digest('hex')
+      const hex = fileSha.digest('hex')
+      files[file.path] = {
+        hash: hex,
+        text: file.kind === 'text' ? file.content : null
+      }
       hash.update(file.path)
       hash.update('\0')
-      hash.update(fileHashes[file.path]!)
+      hash.update(hex)
       hash.update('\x01')
     }
-    return { digest: hash.digest('hex'), fileHashes }
+    return { digest: hash.digest('hex'), files }
   }
 
   async computePublishDiff(): Promise<{
@@ -240,23 +245,28 @@ export default class NotedropPlugin extends Plugin {
     modified: string[]
     removed: string[]
     hasBaseline: boolean
+    current: Record<string, PublishedFileSnapshot>
+    previous: Record<string, PublishedFileSnapshot> | null
   }> {
-    const { fileHashes: current } = await this.computePlanSnapshot()
-    const prev = this.settings.lastPublishedFileHashes
+    const { files: current } = await this.computePlanSnapshot()
+    const prev = this.settings.lastPublishedFiles
     if (!prev) {
       return {
         added: Object.keys(current).sort(),
         modified: [],
         removed: [],
-        hasBaseline: false
+        hasBaseline: false,
+        current,
+        previous: null
       }
     }
     const added: string[] = []
     const modified: string[] = []
     const removed: string[] = []
-    for (const [path, hex] of Object.entries(current)) {
-      if (!(path in prev)) added.push(path)
-      else if (prev[path] !== hex) modified.push(path)
+    for (const [path, snap] of Object.entries(current)) {
+      const before = prev[path]
+      if (!before) added.push(path)
+      else if (before.hash !== snap.hash) modified.push(path)
     }
     for (const path of Object.keys(prev)) {
       if (!(path in current)) removed.push(path)
@@ -265,7 +275,9 @@ export default class NotedropPlugin extends Plugin {
       added: added.sort(),
       modified: modified.sort(),
       removed: removed.sort(),
-      hasBaseline: true
+      hasBaseline: true,
+      current,
+      previous: prev
     }
   }
 
