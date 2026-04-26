@@ -3,6 +3,8 @@ import { dumpStateCommand } from './dumpState.js'
 import { resetCacheCommand } from './resetCache.js'
 import { fakeFingerprintCommand } from './fakeFingerprint.js'
 import { resetBaselineCommand } from './resetBaseline.js'
+import { exportBaselineCommand } from './exportBaseline.js'
+import { dumpLogTailCommand } from './dumpLogTail.js'
 
 /**
  * Dogfood 명령 — debugMode==true 시만 등록.
@@ -17,5 +19,7 @@ export const DOGFOOD_COMMAND_REGISTRY: readonly CommandDef[] = [
   dumpStateCommand,
   resetCacheCommand,
   fakeFingerprintCommand,
-  resetBaselineCommand
+  resetBaselineCommand,
+  exportBaselineCommand,
+  dumpLogTailCommand
 ]
