@@ -470,11 +470,55 @@ PDF Expert 의 View Settings popover 상단 카드 3개 (Vertical Scroll / Horiz
 - **push 시점**: 사용자 명시 승인 후만 (autonomous mode 도 동일)
 - **임시방편 금지**: 표면 fix 전에 "왜 이 위치에서?" 질문, 트레이드오프 함께 제시
 
+## 13.7 Dogfood 자동화 instrumentation
+
+본 섹션은 ADR-0028 결정 정착. AI 세션 dogfood 사이클 자동화 위한 plugin 측 instrumentation. **debugMode==true 시만 활성** — production 사용자에게 위험한 명령 노출 없음.
+
+### 13.7.1 events.jsonl (NDJSON)
+
+- **결정**: plugin 이 `<vault>/.obsidian/plugins/notedrop/events.jsonl` 기록. 1줄 1 JSON entry. trace ID (UUID v4) + timestamp + version + type + data 기록. `githubPat`/`token` 자동 마스킹. Windows concurrent write race 회피 위해 promise queue 직렬화
+- **사유**: 기존 `notedrop.log` 가 multiline JSON (사람-가독) — AI 세션 parse 불안정. NDJSON 분리하여 polling/parse 안정. 기존 log 와 *별도* 파일이라 사람-가독 vs 기계-가독 분리 깔끔
+- **위치**: `plugin/src/services/EventLogger.ts`, `events.jsonl` 기록 (vault 안)
+
+### 13.7.2 dogfood 명령 9개 (debugMode 게이트)
+
+- **결정**: 다음 9 명령 등록. debugMode==true 시만 등록 (main.ts 의 명령 등록 루프 분기):
+  - `dogfood:dump-state` — `ctx.devSnapshot()` 출력 (마스킹)
+  - `dogfood:reset-cache` — `lastViewerCacheKey` null 설정 (cache miss 강제)
+  - `dogfood:fake-fingerprint` — 잘못된 viewer key 설정 (mismatch 검증)
+  - `dogfood:reset-baseline` — 모든 baseline 필드 null (다음 publish = 일괄 push)
+  - `dogfood:export-baseline` — baseline file mapping (hash + hasText) 출력
+  - `dogfood:dump-log-tail` — `notedrop.log` tail (100줄) events.jsonl 기록
+  - `dogfood:trigger-publish-smart` — smart publish + trace + durationMs
+  - `dogfood:trigger-publish-force` — force publish + trace + durationMs
+  - `dogfood:cleanup-stale-buildid` — share repo cleanup (stub, 후속 plan 의무)
+- **사유**: AI 세션이 `obsidian command id=...` 로 trigger 이후 events.jsonl 의 `*_completed` marker polling 으로 결과 회수. settings 직접 변경 위험 (githubPat 노출, 잘못된 path) 회피
+- **위치**: `plugin/src/commands/dogfood/` (9 파일 + registry)
+
+### 13.7.3 DevSnapshot API
+
+- **결정**: `ctx.devSnapshot(): Promise<DevSnapshot>` 정의. internal state (settings + index meta) 마스킹 dump. `githubPat` 마스킹, `lastPublishedFiles` 전체 노출 없음 (count 만)
+- **사유**: settings 전체 dump 시 PAT 노출 위험 + lastPublishedFiles 가 수십~수백 KB 존재해 events.jsonl 부담 발생
+- **위치**: `plugin/src/services/DevSnapshot.ts`
+
+### 13.7.4 debugMode toggle 후 reload 의무
+
+- **결정**: debugMode 변경 후 명령 visibility 갱신 의무 (Settings → Community Plugins → notedrop 토글 OFF/ON). SettingsTab 의 debugMode toggle setDesc 에 안내 추가
+- **사유**: Obsidian 의 명령 등록은 onload 시 1회. runtime toggle 안 됨
+- **위치**: `plugin/src/settings/SettingsTab.ts` debugMode 항목
+
+### 13.7.5 preview server error mirror
+
+- **결정**: PreviewServer 의 console.error → events.jsonl `preview_error` event mirror. `onPreviewError` callback 등록
+- **사유**: AI 세션이 preview 디버깅 시 events.jsonl polling 으로 자동 회수 가능. 외부 브라우저는 obsidian-cli 범위 밖이지만 preview server *내부* error 는 plugin 안에 발생
+- **위치**: `plugin/src/infrastructure/PreviewServer.ts`, `plugin/src/main.ts` (callback 등록)
+
 ## Related
 
 - ADR-0025: manifest.json 위치 = repo root (BRAT)
 - ADR-0026: viewer = vanilla SPA (Rejected, 2026-04-26 Next.js 로 재작성)
 - ADR-0027: publish = GitHub Tree API (Accepted)
+- ADR-0028: dogfood 자동화 instrumentation (events.jsonl + 9 명령)
 - spec §11 MVP Roadmap (M3~M6 마일스톤)
 - memory `feedback_커밋_메시지_특수문자.md` (커밋 컨벤션 원본)
 - memory `project_notedrop_코드맵.md` ("X 바꾸려면 어디?" + 빌드 의존 체인)
