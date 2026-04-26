@@ -2,6 +2,7 @@ import { Notice } from 'obsidian'
 import type { App } from 'obsidian'
 import type { PublishIndex } from '../domain/PublishIndex.js'
 import type { PluginSettings } from '../settings/PluginSettings.js'
+import { resolveShareUrlBase } from '../settings/shareUrl.js'
 
 export async function copyShareUrl(
   app: App,
@@ -18,12 +19,12 @@ export async function copyShareUrl(
     new Notice('notedrop: 공유되지 않은 노트입니다')
     return
   }
-  if (!settings.shareUrlBase) {
-    new Notice('notedrop: 설정에서 Share URL base 를 먼저 지정하세요')
+  const base = resolveShareUrlBase(settings)
+  if (!base) {
+    new Notice('notedrop: target repo 또는 share URL base 가 필요합니다')
     return
   }
   const slugOrHash = item.slug ?? item.hash
-  const base = settings.shareUrlBase.replace(/\/$/, '')
   const url = `${base}/#/${slugOrHash}/`
   await navigator.clipboard.writeText(url)
   new Notice(`복사됨: ${url}`)

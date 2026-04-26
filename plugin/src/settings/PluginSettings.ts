@@ -11,6 +11,7 @@ export type PluginSettings = {
   autoUnpublish: boolean
   shareUrlBase: string
   publishedSeeds: SeedEntry[]
+  unpublishedChanges: boolean
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -23,5 +24,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   autoStartPreview: false,
   autoUnpublish: false,
   shareUrlBase: '',
-  publishedSeeds: []
+  publishedSeeds: [],
+  unpublishedChanges: true
 }

@@ -65,9 +65,9 @@ export default class NotedropPlugin extends Plugin {
     })
 
     this.index.seed(this.normalizeSeeds(this.settings.publishedSeeds))
-    this.index.on('added', () => this.scheduleSeedSave())
-    this.index.on('changed', () => this.scheduleSeedSave())
-    this.index.on('removed', () => this.scheduleSeedSave())
+    this.index.on('added', () => this.markDirtyAndSchedule())
+    this.index.on('changed', () => this.markDirtyAndSchedule())
+    this.index.on('removed', () => this.markDirtyAndSchedule())
 
     this.addSettingTab(new NotedropSettingTab(this.app, this))
 
@@ -94,18 +94,7 @@ export default class NotedropPlugin extends Plugin {
     this.addCommand({
       id: 'publish-vault',
       name: 'Publish vault to GitHub',
-      callback: () => {
-        void publishVault(
-          {
-            app: this.app,
-            vault: this.vault,
-            index: this.index,
-            transformer: this.transformer,
-            manifestBuilder: this.manifestBuilder
-          },
-          this.settings
-        )
-      }
+      callback: () => { void this.runPublish() }
     })
     this.addCommand({
       id: 'start-preview',
@@ -179,6 +168,34 @@ export default class NotedropPlugin extends Plugin {
   async togglePreview(start: boolean): Promise<void> {
     if (start) await this.preview.start()
     else await this.preview.stop()
+  }
+
+  hasUnpublishedChanges(): boolean {
+    return this.settings.unpublishedChanges
+  }
+
+  async runPublish(): Promise<void> {
+    await publishVault(
+      {
+        app: this.app,
+        vault: this.vault,
+        index: this.index,
+        transformer: this.transformer,
+        manifestBuilder: this.manifestBuilder,
+        onPublishSuccess: async () => {
+          this.settings.unpublishedChanges = false
+          await this.saveSettings()
+        }
+      },
+      this.settings
+    )
+  }
+
+  private markDirtyAndSchedule(): void {
+    if (!this.settings.unpublishedChanges) {
+      this.settings.unpublishedChanges = true
+    }
+    this.scheduleSeedSave()
   }
 
   private normalizeSeeds(seeds: SeedEntry[]): SeedEntry[] {
