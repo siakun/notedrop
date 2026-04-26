@@ -1,13 +1,12 @@
 import http from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { unzipSync, strToU8 } from 'fflate'
 import type { VaultFs } from '../ports/VaultFs.js'
 import type { PublishOrchestrator } from '../domain/PublishOrchestrator.js'
 import type { PublishIndex } from '../domain/PublishIndex.js'
 
-import indexHtml from '../embedded/index.html'
-import appJs from '../embedded/app.js.txt'
-import styleCss from '../embedded/style.css'
+import viewerZipB64 from '../embedded/viewer.zip.b64'
 
 export type PreviewServerOptions = {
   port?: number
@@ -20,12 +19,35 @@ export type PreviewServerStatus =
 
 type SsePayload = { event: 'added' | 'changed' | 'removed'; hash: string }
 
+const MIME_BY_EXT: Record<string, string> = {
+  html: 'text/html; charset=utf-8',
+  htm: 'text/html; charset=utf-8',
+  js: 'application/javascript; charset=utf-8',
+  mjs: 'application/javascript; charset=utf-8',
+  css: 'text/css; charset=utf-8',
+  json: 'application/json; charset=utf-8',
+  svg: 'image/svg+xml',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  ico: 'image/x-icon',
+  woff: 'font/woff',
+  woff2: 'font/woff2',
+  ttf: 'font/ttf',
+  txt: 'text/plain; charset=utf-8',
+  md: 'text/markdown; charset=utf-8',
+  map: 'application/json; charset=utf-8'
+}
+
 export class PreviewServer {
   private server: http.Server | null = null
   private status: PreviewServerStatus = { state: 'stopped' }
   private subscribers = new Set<ServerResponse>()
   private indexUnsubs: Array<() => void> = []
   private keepAlive: ReturnType<typeof setInterval> | null = null
+  private viewerAssets: Map<string, Uint8Array> | null = null
 
   constructor(
     private orchestrator: PublishOrchestrator,
@@ -42,6 +64,8 @@ export class PreviewServer {
     if (this.server) return this.status
     const port = this.options.port ?? 4321
     const host = this.options.host ?? '127.0.0.1'
+
+    this.viewerAssets = unpackViewerZip(viewerZipB64)
 
     const server = http.createServer((req, res) => {
       this.handle(req, res).catch((err) => {
@@ -102,6 +126,7 @@ export class PreviewServer {
     })
     this.server = null
     this.status = { state: 'stopped' }
+    this.viewerAssets = null
   }
 
   private subscribeIndex(): void {
@@ -134,16 +159,6 @@ export class PreviewServer {
     const pathname = decodeURIComponent(url.pathname)
 
     if (pathname === '/events') return this.handleEvents(req, res)
-
-    if (pathname === '/' || pathname === '/index.html') {
-      return send(res, 200, 'text/html; charset=utf-8', indexHtml)
-    }
-    if (pathname === '/app.js') {
-      return send(res, 200, 'application/javascript; charset=utf-8', appJs, true)
-    }
-    if (pathname === '/style.css') {
-      return send(res, 200, 'text/css; charset=utf-8', styleCss, true)
-    }
 
     if (pathname === '/manifest.json') {
       const plan = await this.orchestrator.plan()
@@ -195,7 +210,28 @@ export class PreviewServer {
       return
     }
 
+    if (this.serveViewerAsset(pathname, res)) return
+
     send(res, 404, 'text/plain; charset=utf-8', `not found: ${pathname}`)
+  }
+
+  private serveViewerAsset(pathname: string, res: ServerResponse): boolean {
+    if (!this.viewerAssets) return false
+
+    const candidates = candidatePaths(pathname)
+    for (const cand of candidates) {
+      const bytes = this.viewerAssets.get(cand)
+      if (bytes) {
+        const mime = guessMime(cand)
+        res.writeHead(200, {
+          'Content-Type': mime,
+          'Cache-Control': 'no-store'
+        })
+        res.end(Buffer.from(bytes))
+        return true
+      }
+    }
+    return false
   }
 
   private handleEvents(req: IncomingMessage, res: ServerResponse): void {
@@ -218,6 +254,20 @@ export class PreviewServer {
   }
 }
 
+function candidatePaths(pathname: string): string[] {
+  const trimmed = pathname.replace(/^\/+/, '')
+  const candidates = new Set<string>()
+  if (trimmed) candidates.add(trimmed)
+  if (trimmed === '' || trimmed.endsWith('/')) {
+    candidates.add(`${trimmed}index.html`)
+  }
+  if (!trimmed.includes('.') && !trimmed.endsWith('/')) {
+    candidates.add(`${trimmed}/index.html`)
+    candidates.add(`${trimmed}.html`)
+  }
+  return [...candidates]
+}
+
 function send(
   res: ServerResponse,
   status: number,
@@ -232,14 +282,42 @@ function send(
 }
 
 function guessMime(filename: string): string {
-  const ext = filename.split('.').pop()?.toLowerCase()
-  switch (ext) {
-    case 'png': return 'image/png'
-    case 'jpg':
-    case 'jpeg': return 'image/jpeg'
-    case 'svg': return 'image/svg+xml'
-    case 'webp': return 'image/webp'
-    case 'gif': return 'image/gif'
-    default: return 'application/octet-stream'
-  }
+  const ext = filename.split('.').pop()?.toLowerCase() ?? ''
+  return MIME_BY_EXT[ext] ?? 'application/octet-stream'
 }
+
+function unpackViewerZip(b64: string): Map<string, Uint8Array> {
+  const out = new Map<string, Uint8Array>()
+  if (!b64 || !b64.trim()) return out
+  let bytes: Uint8Array
+  try {
+    bytes = base64ToBytes(b64.trim())
+  } catch (err) {
+    console.warn('notedrop preview: viewer.zip base64 decode 실패', err)
+    return out
+  }
+  let entries: Record<string, Uint8Array>
+  try {
+    entries = unzipSync(bytes)
+  } catch (err) {
+    console.warn('notedrop preview: viewer.zip 압축 해제 실패', err)
+    return out
+  }
+  for (const [path, content] of Object.entries(entries)) {
+    out.set(path, content)
+  }
+  return out
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  if (typeof Buffer !== 'undefined') {
+    return new Uint8Array(Buffer.from(b64, 'base64'))
+  }
+  const binary = atob(b64)
+  const out = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i)
+  return out
+}
+
+// keep `strToU8` import valid for type-checking unused branches
+void strToU8

@@ -3,6 +3,7 @@ import process from 'node:process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import builtinModules from 'node:module'
+import { zipSync } from 'fflate'
 
 const watch = process.argv.includes('--watch')
 const prod = process.env.NODE_ENV === 'production'
@@ -22,7 +23,8 @@ const context = await esbuild.context({
   loader: {
     '.html': 'text',
     '.css': 'text',
-    '.txt': 'text'
+    '.txt': 'text',
+    '.b64': 'text'
   },
   external: [
     'obsidian',
@@ -59,27 +61,56 @@ if (watch) {
 }
 
 async function embedViewerAssets() {
-  const src = path.resolve('../viewer/dist')
+  const viewerOut = path.resolve('../viewer/out')
   const dst = path.resolve('src/embedded')
   await fs.mkdir(dst, { recursive: true })
 
-  const sources = [
-    { from: 'index.html', to: 'index.html' },
-    { from: 'app.js', to: 'app.js.txt' },
-    { from: 'style.css', to: 'style.css' }
-  ]
+  let exists = false
+  try {
+    const stat = await fs.stat(viewerOut)
+    exists = stat.isDirectory()
+  } catch {
+    exists = false
+  }
 
-  let missing = 0
-  for (const file of sources) {
-    const fromPath = path.join(src, file.from)
-    try {
-      await fs.copyFile(fromPath, path.join(dst, file.to))
-    } catch {
-      missing += 1
-      await fs.writeFile(path.join(dst, file.to), '')
+  if (!exists) {
+    console.warn(
+      '[notedrop esbuild] viewer/out/ 누락 — "cd ../viewer && npm run build" 먼저 실행해야 viewer 자산이 plugin 에 임베드됩니다. 빈 자산으로 빌드 진행.'
+    )
+    await fs.writeFile(path.join(dst, 'viewer.zip.b64'), '')
+    return
+  }
+
+  const files = await collectFiles(viewerOut, viewerOut)
+  if (files.size === 0) {
+    console.warn('[notedrop esbuild] viewer/out/ 가 비어 있음 — 빈 zip 으로 빌드')
+    await fs.writeFile(path.join(dst, 'viewer.zip.b64'), '')
+    return
+  }
+
+  const entries = {}
+  for (const [relPath, bytes] of files) {
+    entries[relPath] = bytes
+  }
+  const zipped = zipSync(entries, { level: 6 })
+  const b64 = Buffer.from(zipped).toString('base64')
+  await fs.writeFile(path.join(dst, 'viewer.zip.b64'), b64)
+  console.log(
+    `[notedrop esbuild] viewer 자산 ${files.size} 개 → zip ${zipped.byteLength} B → base64 ${b64.length} B`
+  )
+}
+
+async function collectFiles(root, current, acc = new Map()) {
+  const entries = await fs.readdir(current, { withFileTypes: true })
+  for (const entry of entries) {
+    const full = path.join(current, entry.name)
+    if (entry.isDirectory()) {
+      await collectFiles(root, full, acc)
+    } else if (entry.isFile()) {
+      const rel = path.relative(root, full).split(path.sep).join('/')
+      const bytes = await fs.readFile(full)
+      acc.set(rel, new Uint8Array(bytes))
     }
   }
-  if (missing > 0) {
-    console.warn(`[notedrop esbuild] ${missing} viewer asset(s) missing — run "cd ../viewer && npm run build" first`)
-  }
+  return acc
 }
