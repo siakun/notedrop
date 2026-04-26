@@ -12,15 +12,19 @@ summary: 뷰어를 Next.js 가 아닌 vanilla SPA + esbuild 로 구현. 0 의존
 ---
 # ADR-0026: 뷰어 = vanilla SPA (Next.js 미사용)
 
-- **Status**: Proposed, 사용자 검토 필요 (2026-04-26 사용자가 spec §5.2/§11.1.2/§5.4 비호환 지적, 강등됨)
-- **Supersedes**: -- (보류, 사용자 승인 시까지 ADR-0011 이 정전)
-- **Superseded by**: -
+- **Status**: Rejected (사용자 결정 2026-04-26, viewer 재작성으로 대체)
+- **Supersedes**: -
+- **Superseded by**: spec §5.2 + §11.1.2 + ADR-0011 (정전 복귀)
 
-## 강등 사유 (2026-04-26 추가)
+## 검토 이력
 
-본 ADR 의 채택 사유 본문에 "M4 단계 (autonomous run, 사용자 부재) 에서 Next.js 도입을 재평가" 라고 명시되어 있으나, 사용자 부재는 spec §5.2 의 macro 결정 (Next.js + React + unified.js pipeline) 을 자율로 뒤집을 권한이 아님을 사용자가 후속 세션에서 지적. 본래 brainstorming 단계에서 박제된 siakun.github.io 구조 차용 (Next.js App Router + components/ + markdown-pipeline/) 의 의도가 본 ADR 로 누락됨.
+- 2026-04-26 자율 세션 작성. 사유에 "M4 단계 autonomous run 에서 Next.js 도입을 재평가" 명시. 사용자 부재 시 spec §5.2 의 macro 결정 (Next.js + React + unified.js pipeline + siakun.github.io 차용) 을 자율로 뒤집은 절차가 가드레일 위반으로 후속 세션에서 지적. Status "Proposed, 사용자 검토 필요" 로 강등.
+- 2026-04-26 사용자가 viewer 리팩토링 세션 시작 시 본 ADR 을 **Reject**. 사유: spec §5.2/§11.1.2 의 풀 기능 목록 (KaTeX, Mermaid, paged.js, customCss 격리, 페이지 사이즈 프리셋, PDF 다운로드, 옵시디언 코어 문법 풀 셋, 라이브 reload) 을 vanilla JS + marked + DOMPurify 만으로는 충족 불가. 본 ADR 본문이 v2 까지 deferred 한 기능들이 사실 §11.1.2 의 v0.1.0 MVP 범위였음. 또한 사용자가 본인 친숙한 Next.js + React 구조로 작업 + 유지하기를 의도. 본 ADR 은 사후 정당화로 판정.
+- viewer 재작성은 본 세션에서 진행. spec §5.2 + §5.4 + §11.1.2 + ADR-0011 (Static SPA: Next.js `output: 'export'` + `'use client'`) + ADR-0012 (Hexagonal + unified.js) 가 정전. 기존 vanilla 코드는 `backup-vanilla-viewer` 브랜치에 보존.
 
-본 ADR 은 사용자 명시 승인 시까지 정책상 무효. 코드는 보존하되 다음 세션은 spec §5.2 / ADR-0011 을 정전으로 따를 것. viewer 재작성은 별도 세션에서 사용자 동의 후 진행.
+## 본 ADR 의 트레이드오프 분석은 v2 검색·복잡 UI 도입 시 참조용으로 보존
+
+본 ADR 본문의 비교 표 (Next.js / Vite + React Router / Vanilla 비교) 는 향후 viewer 진화 방향 결정 시 참조 가치가 있으므로 본문은 보존. 단 결론은 무효이며, 정책상 spec §5.2 + ADR-0011 을 따를 것.
 
 ## Context
 
