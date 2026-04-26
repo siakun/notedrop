@@ -97,6 +97,50 @@ summary: dogfood 반복 중 사용자가 직접 지시한 UI/UX 사양·명명 �
 - **사유**: 뷰어가 hash 라우팅 (Next.js Static Export + 동적 [hash] 라우트). `#/` 없으면 viewer 가 라우트 인식 못 함
 - **위치**: `plugin/src/commands/copyShareUrl.ts`
 
+### 13.3.5 Bootstrap 자산 publish 제외 (v0.1.40)
+
+- **결정**: viewer.zip 안의 `manifest.json` 과 `content/` 하위 파일은 publish 시 *자동 제외*. plugin 의 PublishOrchestrator 결과만 manifest/content 를 push
+- **사유 (postmortem)**: Next.js viewer 의 정적 빌드 산출물에는 viewer 자체 데모용 `manifest.json` (welcome 노트 1건) + `content/welcome/` 가 들어 있음. 이걸 그대로 push 하면 GitHub Tree API 의 last-write-wins 정책 때문에 사용자 manifest 가 데모 manifest 로 덮어쓰기 됨 (share repo 에 "notedrop 에 오신 것을 환영합니다" 만 노출되는 회귀)
+- **위치**: `plugin/src/services/PlanFactory.ts` `isBootstrapAsset(path)` 가 `path === 'manifest.json' || path.startsWith('content/')` 시 collectViewerFiles 에서 제외
+- **참조**: `docs/postmortems/2026-04-27-publish-bootstrap-overwrite-bug.md`
+
+### 13.3.6 BasePath placeholder pattern (v0.1.34)
+
+- **결정**: viewer 빌드 시 모든 절대 경로 prefix 를 `/__NOTEDROP_BASE__` 로 통일. plugin 이 publish 시점에 사용자의 share repo 이름 (`/notedrop-share` 등) 으로 치환
+- **사유**: viewer 빌드 산출물이 share repo 이름과 무관하게 재사용 가능해야 함. Next.js 의 `basePath` 는 빌드 타임 고정 → placeholder 로 빌드 후 publish 타임 치환
+- **위치**:
+  - viewer: `viewer/src/lib/basePath.ts` `withBase(path)` (icons/이미지/링크 모두 이 함수 사용 의무)
+  - plugin: `plugin/src/services/PlanFactory.ts` 가 publish 직전 모든 텍스트 자산에서 placeholder → 실제 prefix 치환
+- **검증**: `withBase()` 테스트 + `viewer/src/components/panels/ViewSettingsPanel.tsx` 의 SVG icon src 가 `withBase('/icons/...')` 사용
+
+### 13.3.7 Diff-based publish (v0.1.34)
+
+- **결정**: 매 publish 시 `lastPublishedFiles` baseline 과 비교해 변경된 파일만 Tree API 에 보냄 (`base_tree` 보존)
+- **사유**: 이전 v0.1.30 까지 매번 141 파일 (viewer 자산 전체 + 모든 노트) push → 30초 소요. 변경 노트 1건만 보내면 ~3 파일 (manifest + 노트 index.md + 변경된 자산) 으로 축소
+- **위치**:
+  - `plugin/src/services/DirtyTracker.ts` `computeDiff()` (added/changed/removed)
+  - `plugin/src/services/PlanFactory.ts` 가 diff 결과만 Tree API entries 에 포함
+  - meta 파일 (manifest.json / .nojekyll) 은 항상 포함 (§13.3.3)
+- **escape hatch**: §13.3.8/§13.3.9 참조
+
+### 13.3.8 Force publish 명령 (v0.1.34)
+
+- **결정**: `Notedrop: Force publish vault to GitHub` 명령 — dirty gate 무시 + diff 무시 전체 push
+- **사유**: dogfood 중 baseline 손상이나 share repo 외부 수정 의심 시 *전부 다시 보내기* 필요. UI 토글 X (위험 액션이라 일반 Publish 와 시각적 분리)
+- **위치**: `plugin/src/commands/forcePublishVault.ts`
+
+### 13.3.9 Reset publish baseline 명령 (v0.1.36)
+
+- **결정**: `Notedrop: Reset publish baseline` 명령 — `lastPublishedDigest` + `lastPublishedFiles` 모두 null/{} 로 초기화. 다음 publish 가 모든 파일을 새 baseline 으로 push
+- **사유**: share repo 가 외부에서 수정됐거나 plugin 의 baseline 이 손상된 경우 — Force publish 만으로는 baseline 이 보정 안 됨 (force 는 보내기만 하지 baseline 갱신 의미는 동일). Reset 후 다음 publish 가 새 baseline 작성
+- **위치**: `plugin/src/commands/resetPublishBaseline.ts`
+
+### 13.3.10 Show publish diff 명령 (§13.4.4 의 명령화)
+
+- **결정**: §13.4.4 의 diff modal 을 명령 + Settings 버튼 양쪽 진입점으로 노출. 명령 ID 는 `Notedrop: Show publish diff`
+- **사유**: 사용자가 publish 전 검증 흐름을 키보드 (Cmd+P) 만으로 수행 가능해야 함
+- **위치**: `plugin/src/commands/showPublishDiff.ts`
+
 ## 13.4 발행 영속화 (Persistence)
 
 ### 13.4.1 Hash 형식 = dashed UUID
@@ -151,7 +195,48 @@ summary: dogfood 반복 중 사용자가 직접 지시한 UI/UX 사양·명명 �
 - **저장 부담**: `lastPublishedFiles: Record<path, {hash, text|null}>` — 100 노트 vault 기준 ~수백 KB ~ 1MB. binary 는 text=null (diff 시 "binary file (텍스트 diff 미지원)" placeholder)
 - **deferred**: 외부 (GitHub repo) 와 비교 — 현재는 마지막 push 했던 로컬 스냅샷 기준이라 share repo 가 외부에서 수정되면 감지 X. v2 에서 GH API 로 실 remote diff 추가 검토
 
+### 13.4.5 Debug mode + FileLogger (v0.1.39)
+
+- **결정**: Settings 에 Debug mode 토글 추가. ON 일 때 `<vault>/.obsidian/plugins/notedrop/notedrop.log` 에 모든 lifecycle/publish/preview 이벤트를 JSON 라인으로 기록
+- **사유 (postmortem)**: dogfood 중 사용자가 "manifest 가 안 보임" 같은 회귀를 보고하면 콘솔 로그를 클립보드로 옮기는 게 번거로움. 파일 로그면 사용자가 경로만 알려주면 plugin 이 직접 읽어 분석 가능. 부트스트랩 manifest 덮어쓰기 버그도 `manifestEntries: ['manifest.json', 'manifest.json']` 로그 한 줄로 root cause 즉시 발견
+- **redaction**: JSON.stringify replacer 가 `githubPat` / `token` / `pat` / `auth` 키를 자동 마스킹
+- **rotation**: 10MB 도달 시 `notedrop.log.1` 로 rename (단일 백업)
+- **off 시 noop**: `isDebugMode()` callback 으로 toggle 즉시 반영. 비활성 시 disk write 0
+- **위치**: `plugin/src/services/Logger.ts` (FileLogger 클래스) + `plugin/src/main.ts` 가 ctx.logger 로 주입
+- **참조**: `docs/postmortems/2026-04-27-publish-bootstrap-overwrite-bug.md` §검출 단계
+
+### 13.4.6 Plugin Service Layer + Command Pattern (v0.1.33)
+
+- **결정**: `plugin/src/main.ts` 는 Plugin lifecycle + DI wiring 만 담당 (134 줄 dispatcher). 모든 비즈니스 로직은 `plugin/src/services/*` 또는 `plugin/src/commands/*` 에 캡슐화. 명령 추가는 `plugin/src/commands/registry.ts` 의 `COMMAND_REGISTRY: CommandDef[]` 배열에 push 하나로 끝
+- **사유**:
+  - 기존 main.ts (365줄) 가 dirty 계산 / seed 영속화 / publish 실행 / preview 시작 등 모든 책임 — Cmd+P publish vs UI publish 동작 mismatch 같은 회귀의 온상
+  - Command Pattern: `runPublish()` 내부에서 dirty gate 한 번만 체크 → UI/명령 양쪽 동일 동작
+  - Service Layer (DirtyTracker / SeedPersistence / PlanFactory / Logger / PluginContext) 가 main 의 헬퍼 메서드 흩어짐을 응집
+- **위치**: `plugin/src/main.ts` (dispatcher) + `plugin/src/services/PluginContext.ts` (DI 컨테이너 인터페이스) + `plugin/src/commands/registry.ts`
+
+### 13.4.7 Version 4-place sync rule
+
+- **결정**: 한 릴리즈에서 다음 4 곳의 version 이 *동시* 갱신돼야 함:
+  1. `manifest.json` (BRAT root)
+  2. `plugin/package.json`
+  3. `plugin/src/main.ts` `PLUGIN_VERSION` 상수
+  4. `viewer/package.json`
+- **사유**: BRAT 는 `manifest.json` version 만 보고 release 매칭. plugin lifecycle 로그가 PLUGIN_VERSION 으로 stamping. viewer 는 별도 npm 패키지라 자체 version 필요
+- **위치**: 릴리즈 워크플로우 (`release.yml`) 가 manifest.json version 과 git tag 일치 여부 검증. 4-place 자체는 사람이 동시에 갱신
+- **회귀 사례**: v0.1.42 에서 4 곳 중 viewer/package.json + main.ts 누락 → release.yml 검증 통과 + 런타임 로그 stale → v0.1.43, v0.1.44 패치로 동기화
+
 ## 13.5 Viewer (Next.js + React + unified.js) UI 사양
+
+> **v0.1.42 구현 매핑 노트**: 본 §13.5 결정은 dogfood 시기별로 작성되어 일부 함수명 (`renderShell()`, `applyLayoutPagination()`, `paginateVertical`, `paginateStrip`) 은 vanilla SPA 시기의 표현이다. v0.1.42 viewer Hexagonal 재구성 후 실제 구현은:
+> - `renderShell()` → `viewer/src/components/pages/EntryView.tsx` (React 컴포넌트)
+> - `applyLayoutPagination()` → `viewer/src/hooks/useLayoutPagination.ts`
+> - `paginateVertical` / `paginateStrip` → `viewer/src/lib/paginate.ts` (pure functions, hook 에서 호출)
+> - `StripController` → `viewer/src/lib/stripController.ts` (class, hook 에서 owned/destroyed)
+> - View Settings popover → `viewer/src/components/panels/ViewSettingsPanel.tsx`
+> - LiveReload / View Settings 영속화 → `viewer/src/components/providers/{LiveReloadProvider,ViewSettingsProvider}.tsx`
+> - basePath placeholder (icon src 등) → `viewer/src/lib/basePath.ts` `withBase(path)` 의무 사용
+>
+> 결정 자체 (UI 레이아웃, swatch 색, 페이지 크기 4종, paper-page 시각, virtual scroll 동작) 는 그대로 유효.
 
 ### 13.5.0 참조 디자인 (사용자 제공 이미지 매핑)
 

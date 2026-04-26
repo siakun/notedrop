@@ -85,143 +85,168 @@ summary: 플러그인·뷰어 컴포넌트 분해. 모듈별 책임·의존 관�
 
 ## 5.2 뷰어 (Next.js Static SPA)
 
+> **갱신 (v0.1.44 시점, 2026-04-26)**: 본 §5.2 의 Components / Markdown
+> Pipeline / Lib / Hooks 목록는 dogfood + 마이그레이션 진화 후 현재
+> 구현 반영. macro 결정 (Next.js + React + unified.js + Hexagonal) 그대로.
+> 자세한 변경 흐름은 `docs/postmortems/` 참조.
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │ Pages (App Router, output: 'export')                    │
-│  ├── /                    public list (homepage)        │
-│  └── /[hash]              single entry (book or doc)    │
+│  └── /                    단일 page, hash routing       │
+│      (#/<slug-or-hash>/)                                │
 ├─────────────────────────────────────────────────────────┤
 │ Components                                              │
-│  ├── BookViewer           paged.js + 사이드바 TOC       │
-│  ├── DocViewer            paged.js                      │
-│  ├── Sidebar              책 모드 챕터 네비             │
-│  ├── MarkdownRenderer     unified pipeline 호스트       │
-│  ├── PageSizeSelector     A3/A4/A5/B5/B6 토글          │
-│  ├── DownloadPDFButton    window.print()                │
-│  └── LiveReloadProvider   dev: SSE 구독, prod: no-op   │
+│  ├── pages/RootClient     hash routing dispatcher       │
+│  ├── pages/Home           entry list 카드               │
+│  ├── pages/EntryView      doc/book 분기 + paginate      │
+│  ├── layout/Header        brand + crumbs + ViewSettings │
+│  ├── layout/PageIndicator 우하단 floating pill          │
+│  ├── panels/ViewSettings  popover (보기설정 9 섹션)      │
+│  ├── book/Toc, ChapterNav 책 모드 사이드바·이전/다음   │
+│  ├── markdown/MarkdownRenderer  unified pipeline 호스트 │
+│  └── providers/{LiveReload, ViewSettings}Provider       │
 ├─────────────────────────────────────────────────────────┤
-│ Markdown Pipeline (unified plugins)                     │
-│  ├── remark-wikilink         [[Note]]                   │
-│  ├── remark-obsidian-embed   ![[Note]]                  │
-│  ├── remark-callout          > [!info]                  │
-│  ├── remark-math             $$ $$                      │
-│  ├── rehype-katex            수식 렌더                  │
-│  ├── rehype-mermaid          mermaid 렌더               │
-│  └── rehype-react            hast → React               │
+│ Markdown Pipeline (unified + 자체 plugin)               │
+│  ├── remark-parse, remark-gfm, remark-math              │
+│  ├── remark-callout       > [!info] (자체)              │
+│  ├── remark-highlight     ==text== (자체)               │
+│  ├── remark-mermaid       ```mermaid (자체, hast pre)   │
+│  ├── remark-rehype + rehype-raw + rehype-katex          │
+│  └── rehype-stringify     HTML string 출력              │
+│  (wikilink/embed plugin 0 — ContentTransformer 가 이미  │
+│   markdown 텍스트 수준에서 변환. mermaid 렌더는 클라이  │
+│   언트 useEffect mermaid.run())                         │
 ├─────────────────────────────────────────────────────────┤
 │ Lib                                                     │
-│  ├── manifestClient.ts    manifest.json fetch + cache   │
-│  ├── contentClient.ts     /content/<hash> fetch + cache │
-│  ├── cssInjector.ts       페이지별 customCss 주입·격리  │
-│  └── paginationConfig.ts  사이즈 → paged.js 옵션        │
+│  ├── basePath.ts          withBase() placeholder helper │
+│  ├── logger.ts            Debug mode 진단               │
+│  ├── resource.ts          Resource<T> generic           │
+│  ├── router.ts            resolveRoute() 순수 함수      │
+│  ├── manifestClient.ts    Resource<Manifest>            │
+│  ├── contentClient.ts     Resource<PageContent> + parser │
+│  ├── paginate.ts          splitByHeight, computePageFit │
+│  ├── stripController.ts   가상 가로 스크롤 wheel hijack │
+│  └── viewSettings.ts      load/save/applyViewSettings   │
 ├─────────────────────────────────────────────────────────┤
 │ Hooks                                                   │
-│  ├── usePageSize          사이즈 상태 + localStorage    │
-│  ├── useContent(hash)     content fetch + 캐시 + SSE    │
-│  ├── useManifest          manifest fetch + 캐시 + SSE   │
-│  └── useLiveReload        dev: SSE 구독                 │
+│  ├── useManifest          manifest + SSE invalidate     │
+│  ├── useContent(hash)     content + SSE invalidate      │
+│  ├── useRoute             hash routing + render token   │
+│  ├── useCustomCss         페이지별 customCss 격리 주입  │
+│  ├── usePageSizeCss       page CSS 변수 갱신            │
+│  └── useLayoutPagination  paginate + StripController    │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ### 5.2.1 핵심 설계 결정
 
-- **MarkdownRenderer 가 unified pipeline 의 호스트**: 새 옵시디언 문법 지원 = unified plugin 1개 추가. 다른 컴포넌트 안 건드림.
-- **LiveReloadProvider 가 dev-only**: 환경변수로 prod 빌드 시 no-op 으로 컴파일 → 번들에 안 들어감.
-- **contentClient 가 캐시 보유**: SPA 네비게이션 시 같은 콘텐츠 재요청 X. SSE 신호 받으면 해당 hash 만 invalidate.
+- **MarkdownRenderer 가 unified pipeline 호스트**: 새 옵시디언 문법 지원 = unified plugin 1개 추가. dangerouslySetInnerHTML 로 HTML string 삽입 → 페이지네이션 로직이 div.entry-content children 직접 조작 가능.
+- **LiveReloadProvider 가 환경 자동 분기**: hostname=localhost/127.0.0.1 시만 EventSource 활성. prod 에선 no-op (try-catch).
+- **Resource<T> 가 cache + invalidate + subscribe + inflight dedup 추출**: manifestClient + contentClient 가 동일 패턴 재사용.
+- **paged.js 폐기**: §13.5.7 paper-page 분리 패턴이 paged.js column 분할과 mismatch. lib/paginate.ts 가 backup vanilla 의 splitByHeight + measure-render 패턴을 React 안에 이식.
 
 ## 5.3 의존 그래프 (전체)
 
-플러그인 안:
+플러그인 안 (v0.1.33 리팩터링 후):
 ```
-UI (commands, SettingsTab)
+UI (commands/, settings/SettingsTab)
    ↓
-Infrastructure (LocalServer, GitPublisher, VaultEventBridge)
+Services (PluginContext, DirtyTracker, SeedPersistence, PlanFactory, Logger)
+   ↓
+Infrastructure (PreviewServer, GitHubPublisher, VaultEventBridge)
    ↓
 Domain (PublishIndex, ContentResolver, ContentTransformer,
-        AssetCollector, BookAssembler, ManifestBuilder)
+        AssetCollector, BookAssembler, ManifestBuilder, PublishOrchestrator)
    ↓
 Ports (VaultFs, MetaCache, GitClient)
    ↑ (구현)
-Adapters (Obsidian*, Isomorphic*, InMemory*, Fake*)
+Adapters (Obsidian*, InMemory*, Fake*)
 ```
 
-뷰어 안:
+main.ts 는 dispatcher 만 (134줄): 라이프사이클 + Adapter wire-up + ctx 빌드 + COMMAND_REGISTRY iterate.
+
+뷰어 안 (v0.1.42 리팩터링 후):
 ```
-Pages (/, /[hash])
+Pages (app/page.tsx — 단일 hash routing)
    ↓
-Components (BookViewer, MarkdownRenderer, ...)
+Components (pages/RootClient → pages/{Home, EntryView} + layout/* + panels/* + book/*)
    ↓
-Lib (clients, injectors) + Hooks
+Hooks (useRoute, useManifest, useContent, useLayoutPagination, useCustomCss, usePageSizeCss)
    ↓
-Markdown Pipeline (unified plugins)
+Lib (Resource<T>, basePath, logger, router, paginate, stripController, viewSettings)
+   ↓
+Markdown Pipeline (buildProcessor factory + 자체 remark plugin 3종)
 ```
 
 플러그인 ↔ 뷰어:
-- 인터페이스 = HTTP. `/manifest.json`, `/content/<hash>/index.md`, `/content/<hash>/_assets/*`, `/__events`. 뷰어는 응답이 plugin 로컬 서버에서 오든 GH Pages 정적 파일에서 오든 모름 (URL 만 다름).
+- 인터페이스 = HTTP. `/manifest.json`, `/content/<hash>/index.md`, `/content/<hash>/_assets/*`, `/events` (SSE). 뷰어는 응답이 PreviewServer 에서 오든 GH Pages 정적 파일에서 오든 모름.
 
-## 5.4 폴더 구조 (개발 디렉터리, 별도 위치)
+## 5.4 폴더 구조 (v0.1.44 시점)
 
 ```
-notedrop/                                    ← 별도 개발 디렉터리 (TBD)
+notedrop/                                    ← repo root, 모노레포
+├── manifest.json                            ← Obsidian plugin 메타 (BRAT root, ADR-0025)
+├── styles.css                               ← release asset
+├── main.js                                  ← plugin 빌드 산출물 (.gitignore)
+├── README.md
 ├── plugin/                                  ← 옵시디언 플러그인
-│   ├── manifest.json                        ← Obsidian plugin 메타
-│   ├── package.json
-│   ├── esbuild.config.mjs
-│   ├── tsconfig.json
-│   ├── main.ts                              ← Plugin entry
-│   ├── styles.css                           ← 옵시디언 UI CSS (notedrop- prefix)
+│   ├── package.json, tsconfig.json, vitest.config.ts
+│   ├── esbuild.config.mjs                   ← viewer/out/ → fflate.zipSync 인라인
 │   └── src/
+│       ├── main.ts                          ← Plugin entry (dispatcher, 134줄)
+│       ├── types.ts                         ← public Manifest, ManifestItem, PageFrontmatter
 │       ├── settings/
-│       │   ├── PluginSettings.ts            ← 타입 + default
-│       │   └── SettingsTab.ts               ← UI
-│       ├── commands/                        ← 각 명령어 1파일
+│       │   ├── PluginSettings.ts            ← debugMode 포함 12 필드
+│       │   ├── SettingsTab.ts               ← ctx 의존 (plugin reference X)
+│       │   └── shareUrl.ts                  ← deriveShareUrlBase
+│       ├── commands/                        ← v0.1.33 패턴: CommandDef + registry 자기 등록
+│       │   ├── types.ts, registry.ts
+│       │   ├── shareNote.ts, unshareNote.ts
+│       │   ├── openSharedList.ts, copyShareUrl.ts
+│       │   ├── publishVault.ts, forcePublishVault.ts, resetPublishBaseline.ts
+│       │   ├── previewServer.ts (start/stop/openPreview 3개)
+│       │   └── showPublishDiff.ts
+│       ├── services/                        ← v0.1.33 신규 — DI Context + 비즈니스 로직
+│       │   ├── PluginContext.ts             ← plain object DI 14 필드
+│       │   ├── DirtyTracker.ts              ← §13.4.3
+│       │   ├── SeedPersistence.ts           ← §13.4.2
+│       │   ├── PlanFactory.ts               ← v0.1.40 — plan 단일 출처 + bootstrap 자산 제외
+│       │   └── Logger.ts                    ← v0.1.39 — FileLogger
 │       ├── domain/                          ← 옵시디언 의존 0
-│       │   ├── PublishIndex.ts
-│       │   ├── ContentResolver.ts
-│       │   ├── ContentTransformer.ts
-│       │   ├── AssetCollector.ts
-│       │   ├── BookAssembler.ts
-│       │   ├── ManifestBuilder.ts
-│       │   └── types.ts                     ← Reference, TransformedContent 등
+│       │   ├── PublishIndex.ts, ContentResolver.ts, ContentTransformer.ts
+│       │   ├── AssetCollector.ts, BookAssembler.ts, ManifestBuilder.ts
+│       │   ├── PublishOrchestrator.ts
+│       │   └── types.ts
 │       ├── infrastructure/                  ← Adapters
-│       │   ├── ObsidianVaultFs.ts
-│       │   ├── ObsidianMetaCache.ts
-│       │   ├── IsomorphicGitClient.ts
-│       │   ├── LocalServer.ts
-│       │   ├── GitPublisher.ts
-│       │   └── VaultEventBridge.ts
-│       ├── ports/                           ← Domain 이 요구하는 인터페이스
-│       │   ├── VaultFs.ts
-│       │   ├── MetaCache.ts
-│       │   └── GitClient.ts
-│       ├── testing/                         ← 테스트용 fake
-│       │   ├── InMemoryVaultFs.ts
-│       │   ├── FakeMetaCache.ts
-│       │   └── FakeGitClient.ts
-│       └── types.ts
-└── viewer/                                  ← Next.js Static SPA
-    ├── package.json
-    ├── next.config.ts                       ← output: 'export'
-    ├── tsconfig.json
-    ├── public/                              ← 정적 자산
+│       │   ├── ObsidianVaultFs.ts, ObsidianMetaCache.ts, VaultEventBridge.ts
+│       │   ├── PreviewServer.ts             ← HTTP + SSE + viewer.zip unpack
+│       │   └── GitHubPublisher.ts           ← Tree API 6단계
+│       ├── ports/                           ← VaultFs, MetaCache, GitClient
+│       └── testing/                         ← InMemoryVaultFs, FakeMetaCache, FakeGitClient
+└── viewer/                                  ← Next.js Static SPA + React + TypeScript + unified.js
+    ├── package.json, tsconfig.json, vitest.config.ts
+    ├── next.config.mjs                      ← basePath = '/__NOTEDROP_BASE__' (prod placeholder)
+    ├── public/                              ← 정적 자산 (icons/view-settings/*.svg 등)
     └── src/
         ├── app/
-        │   ├── layout.tsx
-        │   ├── page.tsx                     ← / (public list)
-        │   └── [hash]/page.tsx              ← /<hash>
+        │   ├── layout.tsx, page.tsx         ← 단일 page, hash routing
+        │   └── globals.css                  ← 3 테마 + paper-page + view-settings 스타일
         ├── components/
-        │   ├── viewer/                      ← BookViewer, DocViewer, Sidebar
-        │   ├── markdown/                    ← extension React 컴포넌트
-        │   ├── common/                      ← PageSizeSelector, DownloadPDFButton 등
-        │   └── providers/                   ← LiveReloadProvider 등
-        ├── lib/                             ← clients, injectors
-        ├── hooks/                           ← 커스텀 훅
-        ├── markdown-pipeline/               ← unified plugin 모음
-        │   ├── remark-wikilink.ts
-        │   ├── remark-obsidian-embed.ts
-        │   ├── remark-callout.ts
-        │   └── ...
-        └── types/
+        │   ├── pages/                       ← RootClient, Home, EntryView (route destination)
+        │   ├── layout/                      ← Header, PageIndicator (chrome)
+        │   ├── panels/                      ← ViewSettingsPanel (popover)
+        │   ├── book/                        ← Toc, ChapterNav (책 모드 전용)
+        │   ├── markdown/                    ← MarkdownRenderer (host)
+        │   └── providers/                   ← LiveReloadProvider, ViewSettingsProvider
+        ├── hooks/                           ← useManifest, useContent, useRoute, useCustomCss,
+        │                                       usePageSizeCss, useLayoutPagination
+        ├── lib/                             ← Resource<T>, basePath, logger, router, paginate,
+        │                                       stripController, viewSettings, manifestClient, contentClient
+        ├── markdown-pipeline/               ← buildProcessor factory + 자체 remark plugin 3
+        │   ├── index.ts, callout-types.ts
+        │   ├── remark-callout.ts, remark-highlight.ts, remark-mermaid.ts
+        └── types/                           ← manifest, content, viewSettings, pagedjs.d.ts
 ```
 
 ## 5.5 모듈 안정성 등급

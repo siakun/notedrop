@@ -7,7 +7,7 @@ tags:
   - notedrop
   - spec
   - readme
-summary: notedrop 프로젝트 spec 디렉터리 인덱스. arc42 13개 + 프로젝트 고유 1 (13-dogfood-ux) + ADR 27개. 별도 개발 디렉터리로 이전 시 참고 노트 포함
+summary: notedrop 프로젝트 spec 디렉터리 인덱스. arc42 13개 + 프로젝트 고유 1 (13-dogfood-ux) + ADR 27개 + postmortems 2건
 ---
 # notedrop spec
 
@@ -15,12 +15,11 @@ summary: notedrop 프로젝트 spec 디렉터리 인덱스. arc42 13개 + 프로
 
 ## 위치·상태
 
-- 위치 (현재): `notes/notedrop/` (이 옵시디언 볼트 안)
-- 이전 예정 위치: 별도 개발 디렉터리 (TBD, 플러그인·뷰어 코드와 함께 위치)
-- 작성일: 2026-04-26
-- 상태: 설계 완료, 구현 plan 작성 직전
-- spec 버전: 0.1 (브레인스토밍 첫 라운드 결과)
-- 플러그인 예정 버전: 0.1.0 → 0.x → 1.0 (안정화)
+- 위치 (현재): `<repo-root>/docs/` (notedrop 개발 디렉터리, plugin·viewer 코드와 동거)
+- 작성일: 2026-04-26 (이후 dogfood 사이클 동안 누적 갱신)
+- 상태: M1~M5 구현 완료 + dogfood (v0.1.x)
+- spec 버전: 0.1 + 추가 ADR 4개 (0025/0026/0027/0028 시점)
+- 플러그인 현재 버전: 0.1.44 (M5.5 dogfood 마무리)
 
 ## 문서 패턴
 
@@ -47,7 +46,7 @@ summary: notedrop 프로젝트 spec 디렉터리 인덱스. arc42 13개 + 프로
 | 12 | [12-glossary.md](12-glossary.md) | 용어집 |
 | 13 | [13-dogfood-ux-requirements.md](13-dogfood-ux-requirements.md) | dogfood 주도 UX 요구사항 (명명·UI 패턴·설정 시맨틱·영속화·race 방어) |
 
-### ADR (24개)
+### ADR (27개)
 
 `decisions/` 디렉터리. 각 ADR은 [Michael Nygard 표준 형식](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions): Status / Context / Decision / Consequences / Alternatives / Related.
 
@@ -78,43 +77,23 @@ summary: notedrop 프로젝트 spec 디렉터리 인덱스. arc42 13개 + 프로
 | 0023 | [피드백-검색-defer](decisions/0023-피드백-검색-defer.md) | MVP 미장착, v2 |
 | 0024 | [arc42-adr-문서-패턴-채택](decisions/0024-arc42-adr-문서-패턴-채택.md) | 이 디렉터리 자체의 문서 패턴 결정 |
 | 0025 | [manifest-위치-repo-root](decisions/0025-manifest-위치-repo-root.md) | BRAT 호환 위해 manifest/main.js/styles.css 를 repo root 에 |
-| 0026 | [viewer-vanilla-spa](decisions/0026-viewer-vanilla-spa.md) | 뷰어 = vanilla SPA + esbuild (Next.js 미사용, v2 재평가) |
+| 0026 | [viewer-vanilla-spa](decisions/0026-viewer-vanilla-spa.md) | **Rejected** (2026-04-26 viewer Next.js 재작성으로 대체. spec §5.2 의 macro 결정 복귀) |
 | 0027 | [publish-github-tree-api](decisions/0027-publish-github-tree-api.md) | 발행 = GitHub Git Data Tree API (isomorphic-git 미사용) |
 
-## 다음 단계
+### Postmortems
 
-1. 사용자 검토 게이트 (이 spec 검토)
-2. 통과 시 → `superpowers:writing-plans` 스킬로 구현 plan 작성
-3. plan 통과 시 → 별도 개발 디렉터리 생성, 이 spec 일괄 복사
-4. 그 디렉터리에서 TDD 구현 시작 (M1: Domain layer)
+`postmortems/` 디렉터리. dogfood 사이클에서 발견된 회귀의 root cause 분석 (Anthropic engineering 표준 형식).
 
-## 별도 개발 디렉터리로 이전 시 가져갈 것
+| 파일 | 사건 |
+|---|---|
+| [2026-04-27-publish-bootstrap-overwrite-bug.md](postmortems/2026-04-27-publish-bootstrap-overwrite-bug.md) | viewer.zip 의 데모 manifest.json 이 사용자 manifest 를 last-write-wins 로 덮어쓰던 버그 (v0.1.0~v0.1.39 잠재, v0.1.40 fix) |
+| [2026-04-27-viewer-nextjs-migration.md](postmortems/2026-04-27-viewer-nextjs-migration.md) | vanilla SPA → Next.js + React 재작성 결정 + 이행 절차 |
 
-이 spec 파일들 외에 다음을 함께 가져가야 새 환경에서 컨텍스트가 유지된다:
+## 현재 상태
 
-### 1. 이 디렉터리 전체
-
-`notes/notedrop/` 전체로 새 디렉터리에 `docs/spec/` 같은 위치로 이동 또는 복사. 파일 간 상대 링크는 그대로 작동.
-
-### 2. 메모리 항목 (notedrop 관련)
-
-현재 이 볼트의 `C:\Users\User\.claude\projects\C--Users-User-Documents-github-siakun-private-obsidian-personal\memory\` 에 있는 다음 메모리는 새 환경에서도 필요:
-
-- `project_notedrop_별도디렉토리.md` - 이 프로젝트의 워크플로 컨텍스트. 이전 후 spec 위치 갱신 필요
-- (notedrop 관련 추가 메모리는 시간 따라 누적 예정)
-
-### 3. 글로벌 적용 메모리 (이 프로젝트에도 적용)
-
-볼트 단위 메모리지만 코딩 작업 전반에 적용되는 것. 새 환경의 Claude Code 메모리에도 동일하게 복사:
-
-- `feedback_설계원칙_구조적해결.md` - 임시방편 금지, 구조적 원인부터, 트레이드오프 제시
-- `user_github_username.md` - GitHub URL owner는 `siakun` (`sia819` 아님)
-
-기타 볼트 컨벤션 메모리(em-dash 금지, frontmatter 인용 규칙 등)는 옵시디언 콘텐츠 작성 전용이라 이전 불필요.
-
-### 4. 브레인스토밍 대화
-
-대화 자체는 휘발. 하지만 이 spec은 그 대화의 결과를 100% 기록한 형태로 작성됨. 메인 문서 + ADR이 자급자족적이라 추가 컨텍스트 없이도 다음 세션이 이해 가능해야 한다 (그게 안 되면 spec이 부족한 것이므로 보강 필요).
+- spec 은 `<repo-root>/docs/` 에 위치, plugin/viewer 코드와 동거
+- M1~M5 구현 완료. M5.5 dogfood 사이클 (v0.1.31~v0.1.44) 에서 Command Pattern + Service Layer 리팩토링 + bootstrap manifest fix + viewer Hexagonal 재구성 완료
+- M6 (community plugins 마켓 등재 + v1.0 안정화) 진행 중
 
 ## 작업 컨벤션 (이 디렉터리 안 모든 .md에 적용)
 

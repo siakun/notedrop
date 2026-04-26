@@ -12,7 +12,7 @@
 ```
 ┌─────────────────────────┐    PAT + Tree API     ┌─────────────────────────┐
 │ Obsidian + notedrop     │ ────────────────────► │ <username>/<share-repo> │
-│  (vault, plugin)        │                       │  /index.html  /app.js   │
+│  (vault, plugin)        │                       │  /index.html /_next/... │
 │                         │     로컬 SSE 라이브   │  /manifest.json         │
 │  http://127.0.0.1:4321  │ ◄───── 프리뷰 ─────── │  /content/<hash>/       │
 └─────────────────────────┘                       └────────────┬────────────┘
@@ -45,21 +45,28 @@
 /main.js                esbuild 산출물 (release asset, .gitignore)
 /plugin/                plugin TypeScript 소스 + esbuild
   └── src/
-      ├── domain/       의존 없음 (PublishIndex, Resolver, Transformer, AssetCollector, BookAssembler, ManifestBuilder, PublishOrchestrator)
+      ├── domain/       의존 없음 (PublishIndex, Resolver, Transformer, BookAssembler, ManifestBuilder, PublishOrchestrator)
       ├── ports/        VaultFs, MetaCache, GitClient
       ├── infrastructure/ ObsidianVaultFs, ObsidianMetaCache, VaultEventBridge, GitHubPublisher, PreviewServer
       ├── settings/     PluginSettings, SettingsTab, shareUrl
-      ├── commands/     share/unshare/openList/copyUrl/publishVault/previewServer
+      ├── services/     PluginContext, DirtyTracker, SeedPersistence, PlanFactory, Logger
+      ├── commands/     registry.ts (CommandDef[]) + share/unshare/openList/copyUrl/publishVault/forcePublishVault/resetPublishBaseline/previewServer/showPublishDiff
       └── testing/      InMemory*, Fake*
 /viewer/                Next.js Static SPA + React + TypeScript + unified.js
   └── src/
       ├── app/          App Router (layout, page, [hash]/page)
-      ├── components/   markdown/, viewer/, common/, providers/
-      ├── lib/          manifestClient, contentClient, cssInjector, paginationConfig
-      ├── hooks/        useManifest, useContent, usePageSize
+      ├── components/
+      │   ├── pages/    RootClient, Home, EntryView
+      │   ├── layout/   Header, PageIndicator
+      │   ├── panels/   ViewSettingsPanel
+      │   ├── book/     Toc, ChapterNav
+      │   ├── markdown/ MarkdownRenderer
+      │   └── providers/ LiveReloadProvider, ViewSettingsProvider
+      ├── lib/          basePath, logger, resource, router, manifestClient, contentClient, paginate, stripController, viewSettings
+      ├── hooks/        useManifest, useContent, useRoute, useCustomCss, usePageSizeCss, useLayoutPagination
       ├── markdown-pipeline/  unified + remark plugin (callout, highlight, mermaid)
-      └── types/        manifest, content, pagedjs.d.ts
-/docs/                  arc42 13 + ADR 28
+      └── types/        manifest, content
+/docs/                  arc42 13 + ADR 28 + postmortems/
 /.github/workflows/
   ├── release.yml       tag push → plugin build (viewer 자산 zip 인라인) → GH release
   └── deploy.yml        viewer/** 변경 → next build → GH Pages 자동 배포
@@ -92,7 +99,10 @@
 | `Notedrop: Unshare this note` | `notedrop-publish: false` 로 토글 |
 | `Notedrop: Open shared list` | 발행 인덱스 모달, 클릭 시 노트 열기 |
 | `Notedrop: Copy share URL` | `<auto-derived-pages-url>/#/<hash 또는 slug>/` 클립보드 복사 |
-| `Notedrop: Publish vault to GitHub` | 변환 → Tree API atomic commit (Settings 의 Publish 버튼과 동일) |
+| `Notedrop: Publish vault to GitHub` | 변환 → Tree API atomic commit. dirty 없으면 noop (Settings 의 Publish 버튼과 동일) |
+| `Notedrop: Force publish vault to GitHub` | dirty gate 무시하고 강제 전체 push (escape hatch) |
+| `Notedrop: Reset publish baseline` | `lastPublishedDigest`/`lastPublishedFiles` 초기화. 다음 publish 가 모든 파일을 새 baseline 으로 push (share repo 가 외부에서 수정됐을 때) |
+| `Notedrop: Show publish diff` | 다음 publish 가 보낼 파일 목록과 라인 단위 diff modal (GitHub Desktop 류 split view) |
 | `Notedrop: Start/Stop preview server` | 로컬 http://127.0.0.1:4321 서버 (SSE 라이브 리로드) |
 | `Notedrop: Open preview in browser` | 시작 + 브라우저 자동 오픈 |
 
@@ -121,9 +131,9 @@ v2 deferred: 검색 (Lunr.js), Excalidraw embed, 다크 테마, 커스텀 도메
 ```bash
 cd plugin
 npm install
-npm test            # vitest (210+ 테스트)
+npm test            # vitest (211 테스트)
 npm run typecheck
-npm run build       # esbuild → ../main.js (viewer/dist 자동 인라인)
+npm run build       # esbuild → ../main.js (viewer/out → viewer.zip.b64 자동 인라인)
 npm run dev         # esbuild watch
 ```
 
@@ -132,8 +142,9 @@ npm run dev         # esbuild watch
 ```bash
 cd viewer
 npm install
+npm test            # vitest (54 테스트)
 npm run typecheck
-npm run build       # next build → out/ (Next.js export)
+npm run build       # next build → out/ (Next.js export, basePath = /__NOTEDROP_BASE__ placeholder)
 npm run dev         # next dev (http://localhost:3000)
 ```
 
@@ -156,7 +167,8 @@ git push origin main 0.1.9
 - [x] **M3** Publishing pipeline + GitHub Tree API
 - [x] **M4** Viewer = Next.js + React + TypeScript + unified.js (spec §5.2 표준 복귀, ADR-0011/0012)
 - [x] **M5** Polish + Preview server (SSE 라이브 리로드)
-- [ ] **M6** dogfood + community plugins 마켓 등재 (v1.0 안정화)
+- [x] **M5.5** dogfood 사이클: bootstrap manifest 덮어쓰기 fix (v0.1.40), Command Pattern + Service Layer 리팩토링 (v0.1.33), basePath placeholder (v0.1.34), diff-based publish (v0.1.34), Debug mode FileLogger (v0.1.39), viewer Hexagonal 재구성 (v0.1.42)
+- [ ] **M6** dogfood 마무리 + community plugins 마켓 등재 (v1.0 안정화)
 
 ## v2 백로그
 
