@@ -261,20 +261,42 @@ function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)) }
 function round1(n) { return Math.round(n * 10) / 10 }
 function mmToPx(mm) { return mm * (96 / 25.4) }
 
-/* ─── Layout pagination (vertical mode = real paper-page divs) ──────── */
+/* ─── Layout pagination (paper-page divs for all non-default layouts) ── */
+
+let stripController = null
 
 function applyLayoutPagination() {
   const content = document.querySelector('.entry-content')
   if (!content) return
   const layout = document.body.dataset.layout
   unpaginate(content)
+  if (stripController) { stripController.destroy(); stripController = null }
+  const settings = loadViewSettings()
   if (layout === 'vertical') {
-    const settings = loadViewSettings()
     paginateVertical(content, settings)
+  } else if (layout === 'horizontal' || layout === 'two-pages') {
+    paginateStrip(content, settings, layout)
   }
 }
 
 function unpaginate(content) {
+  // Unwrap from page-strip first
+  const strip = content.querySelector(':scope > .page-strip')
+  if (strip) {
+    const flat = []
+    for (const page of Array.from(strip.children)) {
+      flat.push(...Array.from(page.children))
+    }
+    content.innerHTML = ''
+    for (const c of flat) {
+      // reset any inline width/height set by strip pagination
+      c.style.removeProperty('width')
+      c.style.removeProperty('height')
+      content.appendChild(c)
+    }
+    return
+  }
+  // Unwrap from direct paper-page sections
   const sections = content.querySelectorAll(':scope > .paper-page')
   if (sections.length === 0) return
   for (const sec of sections) {
@@ -303,18 +325,7 @@ function paginateVertical(content, settings) {
   const heights = flat.map((c) => c.offsetHeight)
 
   // Decide page groups
-  const groups = [[]]
-  let used = 0
-  for (let i = 0; i < flat.length; i++) {
-    const h = heights[i]
-    const lastGroup = groups[groups.length - 1]
-    if (used + h > innerHeightPx && lastGroup.length > 0) {
-      groups.push([])
-      used = 0
-    }
-    groups[groups.length - 1].push(i)
-    used += h
-  }
+  const groups = splitByHeight(heights, innerHeightPx)
 
   // Create real pages
   content.innerHTML = ''
@@ -325,23 +336,208 @@ function paginateVertical(content, settings) {
   }
 }
 
+function paginateStrip(content, settings, layout) {
+  const flat = Array.from(content.children)
+  if (flat.length === 0) return
+
+  const fit = computePageFit(settings, layout)
+  if (!fit) return
+
+  // Measure children's heights at fitted page-inner width
+  const measure = createPaperPage()
+  applyFitDims(measure, fit)
+  for (const child of flat) measure.appendChild(child)
+  content.innerHTML = ''
+  content.appendChild(measure)
+  const heights = flat.map((c) => c.offsetHeight)
+  const groups = splitByHeight(heights, fit.innerHeight)
+
+  // Build strip
+  content.innerHTML = ''
+  const strip = document.createElement('div')
+  strip.className = 'page-strip'
+  for (const group of groups) {
+    const page = createPaperPage()
+    applyFitDims(page, fit)
+    for (const idx of group) page.appendChild(flat[idx])
+    strip.appendChild(page)
+  }
+  content.appendChild(strip)
+
+  stripController = new StripController(strip, layout, groups.length)
+}
+
+function applyFitDims(pageEl, fit) {
+  pageEl.style.width = `${fit.width}px`
+  pageEl.style.height = `${fit.height}px`
+  pageEl.style.padding = `${fit.padTop}px ${fit.padRight}px ${fit.padBottom}px ${fit.padLeft}px`
+}
+
+function computePageFit(settings, layout) {
+  const dims = PAGE_DIMS[settings.pageSize] ?? PAGE_DIMS.A4
+  const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) || 56
+  const viewportH = window.innerHeight - headerH - 32
+  const viewportW = window.innerWidth - 32
+  if (viewportH <= 0 || viewportW <= 0) return null
+
+  const ratio = dims.w / dims.h
+  const gap = 16
+  const horizPaddingExtra = 32  // breathing room around the page
+
+  let pageHeight = viewportH - 32
+  let pageWidth = pageHeight * ratio
+
+  if (layout === 'two-pages') {
+    const widthBudget = (viewportW - gap - horizPaddingExtra * 2) / 2
+    if (widthBudget < pageWidth) {
+      pageWidth = widthBudget
+      pageHeight = pageWidth / ratio
+    }
+  } else {
+    const widthBudget = viewportW - horizPaddingExtra * 2
+    if (widthBudget < pageWidth) {
+      pageWidth = widthBudget
+      pageHeight = pageWidth / ratio
+    }
+  }
+  if (pageHeight <= 0 || pageWidth <= 0) return null
+
+  const scale = pageHeight / mmToPx(dims.h)
+  const padTop = mmToPx(settings.marginTop) * scale
+  const padBottom = mmToPx(settings.marginBottom) * scale
+  const padLeft = mmToPx(settings.marginLeft) * scale
+  const padRight = mmToPx(settings.marginRight) * scale
+  const innerHeight = pageHeight - padTop - padBottom
+
+  return {
+    width: pageWidth,
+    height: pageHeight,
+    padTop, padBottom, padLeft, padRight,
+    innerHeight,
+    gap
+  }
+}
+
+function splitByHeight(heights, limit) {
+  const groups = [[]]
+  let used = 0
+  for (let i = 0; i < heights.length; i++) {
+    const h = heights[i]
+    const lastGroup = groups[groups.length - 1]
+    if (used + h > limit && lastGroup.length > 0) {
+      groups.push([])
+      used = 0
+    }
+    groups[groups.length - 1].push(i)
+    used += h
+  }
+  return groups
+}
+
 function createPaperPage() {
   const page = document.createElement('section')
   page.className = 'paper-page'
   return page
 }
 
+/* ─── Strip controller (virtual page-flip scroll) ────────────────────── */
+
+class StripController {
+  constructor(strip, layout, totalPages) {
+    this.strip = strip
+    this.layout = layout
+    this.total = totalPages
+    this.current = 0
+    this.pagesPerView = layout === 'two-pages' ? 2 : 1
+    this.boundWheel = this.onWheel.bind(this)
+    this.boundKey = this.onKey.bind(this)
+    this.viewport = strip.parentElement
+    this.viewport.addEventListener('wheel', this.boundWheel, { passive: false })
+    document.addEventListener('keydown', this.boundKey)
+    this.update()
+  }
+
+  destroy() {
+    if (this.viewport) this.viewport.removeEventListener('wheel', this.boundWheel)
+    document.removeEventListener('keydown', this.boundKey)
+  }
+
+  onWheel(e) {
+    if (e.shiftKey) return
+    e.preventDefault()
+    const dir = (e.deltaY > 0 || e.deltaX > 0) ? 1 : -1
+    this.advance(dir)
+  }
+
+  onKey(e) {
+    if (document.body.dataset.layout !== this.layout) return
+    const tag = document.activeElement?.tagName
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+      e.preventDefault(); this.advance(1)
+    } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      e.preventDefault(); this.advance(-1)
+    } else if (e.key === 'Home') {
+      e.preventDefault(); this.goTo(0)
+    } else if (e.key === 'End') {
+      e.preventDefault(); this.goTo(this.total - 1)
+    }
+  }
+
+  advance(dir) {
+    const step = this.pagesPerView
+    const groupCount = Math.ceil(this.total / step)
+    let groupIdx = Math.floor(this.current / step) + dir
+    groupIdx = clamp(groupIdx, 0, groupCount - 1)
+    this.goTo(groupIdx * step)
+  }
+
+  goTo(pageIdx) {
+    this.current = clamp(pageIdx, 0, this.total - 1)
+    this.update()
+  }
+
+  update() {
+    const pages = this.strip.querySelectorAll('.paper-page')
+    if (pages.length === 0) return
+    const pageW = pages[0].offsetWidth
+    const gap = 16
+    const groupIdx = Math.floor(this.current / this.pagesPerView)
+    const offset = groupIdx * (pageW * this.pagesPerView + gap * this.pagesPerView)
+    this.strip.style.transform = `translateX(-${offset}px)`
+    updatePageIndicatorFromController(this.current, this.total, this.layout)
+  }
+}
+
+function updatePageIndicatorFromController(current, total, layout) {
+  const indicator = document.getElementById('page-indicator')
+  if (!indicator) return
+  const elC = indicator.querySelector('#page-current')
+  const elT = indicator.querySelector('#page-total')
+  if (!elC || !elT) return
+  if (layout === 'two-pages') {
+    const start = current + 1
+    const end = Math.min(start + 1, total)
+    elC.textContent = start === end ? `${start}` : `${start}–${end}`
+  } else {
+    elC.textContent = String(current + 1)
+  }
+  elT.textContent = String(total)
+  indicator.hidden = false
+}
+
 /* ─── Page indicator (horizontal/two-pages) ─────────────────────────── */
 
-let pageIndicatorScrollTarget = null
-let pageIndicatorScrollHandler = null
-let pageIndicatorWheelHandler = null
-let pageIndicatorKeyHandler = null
-let snapTimer = null
-let isSnapping = false
+let resizeReflowTimer = null
 
 function setupPageIndicatorListeners() {
-  window.addEventListener('resize', () => requestAnimationFrame(updatePageIndicator))
+  window.addEventListener('resize', () => {
+    if (resizeReflowTimer) clearTimeout(resizeReflowTimer)
+    resizeReflowTimer = setTimeout(() => {
+      applyLayoutPagination()
+      updatePageIndicator()
+    }, 150)
+  })
 }
 
 function updatePageIndicator() {
@@ -349,149 +545,12 @@ function updatePageIndicator() {
   if (!indicator) return
   const layout = document.body.dataset.layout
   const isHorizontal = layout === 'horizontal' || layout === 'two-pages'
-  if (!isHorizontal) {
-    indicator.hidden = true
-    detachScrollListener()
-    return
-  }
-  const content = document.querySelector('.entry-content')
-  if (!content) {
-    indicator.hidden = true
-    detachScrollListener()
-    return
-  }
-  const scrollEl = findScrollEl(content)
-  if (!scrollEl) {
-    indicator.hidden = true
-    detachScrollListener()
-    return
-  }
-  attachScrollListener(scrollEl)
-
-  const cs = getComputedStyle(content)
-  const colWidth = parseFloat(cs.columnWidth)
-  const colGap = parseFloat(cs.columnGap) || 0
-  const padLeft = parseFloat(cs.paddingLeft) || 0
-  const padRight = parseFloat(cs.paddingRight) || 0
-  if (!colWidth || !isFinite(colWidth)) {
+  if (!isHorizontal || !stripController) {
     indicator.hidden = true
     return
   }
-  const unit = colWidth + colGap
-  const innerScrollWidth = Math.max(0, content.scrollWidth - padLeft - padRight)
-  const total = Math.max(1, Math.round((innerScrollWidth + colGap) / unit))
-  const scrollLeft = scrollEl.scrollLeft
-  const currentRaw = Math.floor(scrollLeft / unit) + 1
-  const current = clamp(currentRaw, 1, total)
-
-  const elCurrent = indicator.querySelector('#page-current')
-  const elTotal = indicator.querySelector('#page-total')
-  if (layout === 'two-pages') {
-    const pairStart = Math.min(Math.floor((current - 1) / 2) * 2 + 1, total)
-    const pairEnd = Math.min(pairStart + 1, total)
-    elCurrent.textContent = pairStart === pairEnd ? `${pairStart}` : `${pairStart}–${pairEnd}`
-  } else {
-    elCurrent.textContent = String(current)
-  }
-  elTotal.textContent = String(total)
+  // StripController.update() already updates indicator content; just ensure visible
   indicator.hidden = false
-}
-
-function findScrollEl(content) {
-  let el = content.parentElement
-  while (el && el !== document.body) {
-    const cs = getComputedStyle(el)
-    const ox = cs.overflowX
-    if (ox === 'auto' || ox === 'scroll') return el
-    el = el.parentElement
-  }
-  return null
-}
-
-function attachScrollListener(el) {
-  if (pageIndicatorScrollTarget === el) return
-  detachScrollListener()
-  pageIndicatorScrollTarget = el
-
-  pageIndicatorScrollHandler = () => {
-    requestAnimationFrame(updatePageIndicator)
-    if (isSnapping) return
-    if (snapTimer) clearTimeout(snapTimer)
-    snapTimer = setTimeout(() => snapToPage(el), 180)
-  }
-  el.addEventListener('scroll', pageIndicatorScrollHandler, { passive: true })
-
-  // Hijack vertical wheel → horizontal scroll
-  pageIndicatorWheelHandler = (e) => {
-    if (e.shiftKey) return
-    const dy = e.deltaY
-    const dx = e.deltaX
-    if (dy === 0) return
-    if (Math.abs(dy) <= Math.abs(dx)) return  // user is scrolling horizontally explicitly
-    e.preventDefault()
-    el.scrollLeft += dy
-  }
-  el.addEventListener('wheel', pageIndicatorWheelHandler, { passive: false })
-
-  // Keyboard arrow page nav
-  pageIndicatorKeyHandler = (e) => {
-    const layout = document.body.dataset.layout
-    if (layout !== 'horizontal' && layout !== 'two-pages') return
-    if (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return
-    const stride = computePageStride(el)
-    if (!stride) return
-    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
-      e.preventDefault()
-      el.scrollBy({ left: stride, behavior: 'smooth' })
-    } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-      e.preventDefault()
-      el.scrollBy({ left: -stride, behavior: 'smooth' })
-    }
-  }
-  document.addEventListener('keydown', pageIndicatorKeyHandler)
-}
-
-function detachScrollListener() {
-  if (pageIndicatorScrollTarget) {
-    if (pageIndicatorScrollHandler)
-      pageIndicatorScrollTarget.removeEventListener('scroll', pageIndicatorScrollHandler)
-    if (pageIndicatorWheelHandler)
-      pageIndicatorScrollTarget.removeEventListener('wheel', pageIndicatorWheelHandler)
-  }
-  if (pageIndicatorKeyHandler) {
-    document.removeEventListener('keydown', pageIndicatorKeyHandler)
-  }
-  if (snapTimer) {
-    clearTimeout(snapTimer)
-    snapTimer = null
-  }
-  pageIndicatorScrollTarget = null
-  pageIndicatorScrollHandler = null
-  pageIndicatorWheelHandler = null
-  pageIndicatorKeyHandler = null
-}
-
-function computePageStride(scrollEl) {
-  const content = scrollEl.querySelector('.entry-content')
-  if (!content) return 0
-  const cs = getComputedStyle(content)
-  const colW = parseFloat(cs.columnWidth)
-  const colG = parseFloat(cs.columnGap) || 0
-  if (!colW || !isFinite(colW)) return 0
-  const unit = colW + colG
-  const layout = document.body.dataset.layout
-  return layout === 'two-pages' ? unit * 2 : unit
-}
-
-function snapToPage(scrollEl) {
-  if (snapTimer) { clearTimeout(snapTimer); snapTimer = null }
-  const stride = computePageStride(scrollEl)
-  if (!stride) return
-  const target = Math.round(scrollEl.scrollLeft / stride) * stride
-  if (Math.abs(target - scrollEl.scrollLeft) < 2) return
-  isSnapping = true
-  scrollEl.scrollTo({ left: target, behavior: 'smooth' })
-  setTimeout(() => { isSnapping = false }, 400)
 }
 
 function isPreviewHost() {

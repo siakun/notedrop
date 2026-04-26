@@ -567,14 +567,15 @@ body[data-layout="vertical"] .entry-content {
 
 body[data-layout="vertical"] .paper-page {
   width: var(--page-width);
-  min-height: var(--page-height);
+  height: var(--page-height);
   padding: var(--page-margin-top) var(--page-margin-right) var(--page-margin-bottom) var(--page-margin-left);
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: 4px;
   box-shadow: 0 8px 24px var(--color-card-shadow);
-  overflow: visible;
+  overflow: hidden;
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 body[data-layout="vertical"] .app-shell.book {
@@ -590,70 +591,81 @@ body[data-layout="vertical"] .app-shell.book article {
   align-items: center;
 }
 
-/* Horizontal / Two Pages = paged horizontal scroll, fixed page-height */
+/* Horizontal / Two Pages = paper-page strip, viewport-fit, transform-based page flip */
 body[data-layout="horizontal"] .app-shell,
 body[data-layout="two-pages"] .app-shell {
   max-width: none;
   margin: 0;
-  padding: 1.5rem;
-  height: calc(var(--page-height) + 3rem);
-  min-height: calc(100vh - var(--header-height));
-  overflow-x: auto;
-  overflow-y: visible;
-  scrollbar-gutter: stable;
+  padding: 0;
+  height: calc(100vh - var(--header-height));
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 body[data-layout="horizontal"] .app-shell.book,
 body[data-layout="two-pages"] .app-shell.book {
   display: grid;
   grid-template-columns: 240px 1fr;
-  gap: 1rem;
-  align-items: start;
+  gap: 0;
+  align-items: stretch;
 }
 
 body[data-layout="horizontal"] .app-shell.book .toc,
 body[data-layout="two-pages"] .app-shell.book .toc {
-  position: sticky;
-  left: 0;
-  z-index: 5;
   background: var(--color-bg);
-  height: var(--page-height);
+  border-right: 1px solid var(--color-border);
+  padding: 1rem;
+  height: 100%;
   overflow-y: auto;
 }
 
 body[data-layout="horizontal"] .app-shell.book article,
 body[data-layout="two-pages"] .app-shell.book article {
-  height: var(--page-height);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
 body[data-layout="horizontal"] .entry-content,
 body[data-layout="two-pages"] .entry-content {
-  height: var(--page-height);
-  width: max-content;
-  padding: var(--page-margin-top) 0 var(--page-margin-bottom);
-  background-color: transparent;
-  /* Each "page-width" stripe shows paper bg, followed by 16px gap (canvas color) */
-  background-image: repeating-linear-gradient(
-    to right,
-    var(--color-bg-elevated) 0,
-    var(--color-bg-elevated) var(--page-width),
-    transparent var(--page-width),
-    transparent calc(var(--page-width) + 16px)
-  );
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  background: transparent;
   border: none;
   box-shadow: none;
   border-radius: 0;
-  column-width: var(--page-width);
-  column-gap: 16px;
-  column-fill: auto;
-  column-rule: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
 }
 
-/* Side margins applied to each child so every column gets margin */
-body[data-layout="horizontal"] .entry-content > *,
-body[data-layout="two-pages"] .entry-content > * {
-  margin-left: var(--page-margin-left);
-  margin-right: var(--page-margin-right);
+.page-strip {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  align-items: center;
+  height: 100%;
+  will-change: transform;
+}
+
+body[data-layout="horizontal"] .page-strip .paper-page,
+body[data-layout="two-pages"] .page-strip .paper-page {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  box-shadow: 0 8px 24px var(--color-card-shadow);
+  flex-shrink: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  /* width/height/padding set by JS for viewport fit */
 }
 
 /* Hide chapter-nav in book modes (use horizontal scroll instead) */
