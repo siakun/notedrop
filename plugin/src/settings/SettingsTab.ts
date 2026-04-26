@@ -46,6 +46,7 @@ export class NotedropSettingTab extends PluginSettingTab {
     this.renderPreviewSettings(containerEl)
     this.renderBehaviorSettings(containerEl)
     this.renderSharedList(containerEl)
+    this.renderAdvanced(containerEl)
   }
 
   private renderActions(containerEl: HTMLElement): void {
@@ -175,63 +176,10 @@ export class NotedropSettingTab extends PluginSettingTab {
           })
       )
 
-    new Setting(containerEl)
-      .setName('Target branch')
-      .setDesc('발행 commit 을 push 할 브랜치 (기본 main).')
-      .addText((text) =>
-        text
-          .setPlaceholder('main')
-          .setValue(this.plugin.settings.targetBranch)
-          .onChange(async (value) => {
-            this.plugin.settings.targetBranch = value.trim() || 'main'
-            await this.plugin.saveSettings()
-          })
-      )
-
-    new Setting(containerEl)
-      .setName('Public root')
-      .setDesc('변환 산출물이 push 될 레포 내 경로. 기본 빈 값 = repo root (별도 share repo 권장). 모노레포면 viewer/public.')
-      .addText((text) =>
-        text
-          .setPlaceholder('(empty = root)')
-          .setValue(this.plugin.settings.publicRoot)
-          .onChange(async (value) => {
-            this.plugin.settings.publicRoot = value.trim().replace(/^\/|\/$/g, '')
-            await this.plugin.saveSettings()
-          })
-      )
-
-    new Setting(containerEl)
-      .setName('Publish viewer assets')
-      .setDesc('publish 마다 뷰어 (index.html/app.js/style.css) 도 같이 push. 별도 share repo 면 ON.')
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.publishViewerAssets)
-          .onChange(async (value) => {
-            this.plugin.settings.publishViewerAssets = value
-            await this.plugin.saveSettings()
-          })
-      )
   }
 
   private renderPreviewSettings(containerEl: HTMLElement): void {
     containerEl.createEl('h3', { text: '미리보기 설정' })
-
-    new Setting(containerEl)
-      .setName('Preview port')
-      .setDesc('로컬 프리뷰 서버 포트 (1024–65535).')
-      .addText((text) =>
-        text
-          .setPlaceholder('4321')
-          .setValue(String(this.plugin.settings.previewPort))
-          .onChange(async (value) => {
-            const n = Number.parseInt(value, 10)
-            if (Number.isFinite(n) && n >= 1024 && n <= 65535) {
-              this.plugin.settings.previewPort = n
-              await this.plugin.saveSettings()
-            }
-          })
-      )
 
     new Setting(containerEl)
       .setName('Auto start preview')
@@ -274,5 +222,69 @@ export class NotedropSettingTab extends PluginSettingTab {
       const li = list.createEl('li')
       li.setText(`${item.title}  (${item.render})  ${item.filePath}`)
     }
+  }
+
+  private renderAdvanced(containerEl: HTMLElement): void {
+    const details = containerEl.createEl('details', { cls: 'notedrop-advanced' })
+    const summary = details.createEl('summary')
+    summary.createSpan({ cls: 'notedrop-advanced-chevron', text: '▶' })
+    summary.createSpan({
+      cls: 'notedrop-advanced-label',
+      text: '고급 설정 (기본값 권장)'
+    })
+
+    new Setting(details)
+      .setName('Target branch')
+      .setDesc('발행 commit 을 push 할 브랜치 (기본 main).')
+      .addText((text) =>
+        text
+          .setPlaceholder('main')
+          .setValue(this.plugin.settings.targetBranch)
+          .onChange(async (value) => {
+            this.plugin.settings.targetBranch = value.trim() || 'main'
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(details)
+      .setName('Public root')
+      .setDesc('변환 산출물이 push 될 레포 내 경로. 기본 빈 값 = repo root (별도 share repo 권장). 모노레포면 viewer/public.')
+      .addText((text) =>
+        text
+          .setPlaceholder('(empty = root)')
+          .setValue(this.plugin.settings.publicRoot)
+          .onChange(async (value) => {
+            this.plugin.settings.publicRoot = value.trim().replace(/^\/|\/$/g, '')
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(details)
+      .setName('Publish viewer assets')
+      .setDesc('publish 마다 뷰어 (index.html/app.js/style.css) 도 같이 push. 별도 share repo 면 ON.')
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.publishViewerAssets)
+          .onChange(async (value) => {
+            this.plugin.settings.publishViewerAssets = value
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(details)
+      .setName('Preview port')
+      .setDesc('로컬 프리뷰 서버 포트 (1024–65535).')
+      .addText((text) =>
+        text
+          .setPlaceholder('4321')
+          .setValue(String(this.plugin.settings.previewPort))
+          .onChange(async (value) => {
+            const n = Number.parseInt(value, 10)
+            if (Number.isFinite(n) && n >= 1024 && n <= 65535) {
+              this.plugin.settings.previewPort = n
+              await this.plugin.saveSettings()
+            }
+          })
+      )
   }
 }
