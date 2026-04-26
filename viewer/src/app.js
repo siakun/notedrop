@@ -266,11 +266,12 @@ function mmToPx(mm) { return mm * (96 / 25.4) }
 let stripController = null
 
 function applyLayoutPagination() {
+  // Always destroy old controller — even if no new entry-content
+  if (stripController) { stripController.destroy(); stripController = null }
   const content = document.querySelector('.entry-content')
   if (!content) return
   const layout = document.body.dataset.layout
   unpaginate(content)
-  if (stripController) { stripController.destroy(); stripController = null }
   const settings = loadViewSettings()
   if (layout === 'vertical') {
     paginateVertical(content, settings)
@@ -564,24 +565,33 @@ function isPreviewHost() {
 
 function connectLiveReload() {
   let backoff = 500
+  let reloadPending = false
+  let reloadRunning = false
   const open = () => {
     const es = new EventSource('events')
     es.addEventListener('hello', () => {
       backoff = 500
       showLiveBadge('connected')
     })
-    const reload = async () => {
+    const runReload = async () => {
+      if (reloadRunning) { reloadPending = true; return }
+      reloadRunning = true
       try {
-        await loadManifest()
-        await render()
-        flashLiveBadge()
+        do {
+          reloadPending = false
+          await loadManifest()
+          await render()
+          flashLiveBadge()
+        } while (reloadPending)
       } catch (err) {
         console.warn('notedrop live reload 실패', err)
+      } finally {
+        reloadRunning = false
       }
     }
-    es.addEventListener('added', reload)
-    es.addEventListener('changed', reload)
-    es.addEventListener('removed', reload)
+    es.addEventListener('added', runReload)
+    es.addEventListener('changed', runReload)
+    es.addEventListener('removed', runReload)
     es.onerror = () => {
       es.close()
       showLiveBadge('reconnecting')
@@ -631,7 +641,9 @@ async function loadManifest() {
   }
 }
 
+let renderToken = 0
 async function render() {
+  const myToken = ++renderToken
   resetCustomCss()
   const route = parseRoute()
   let result
@@ -639,7 +651,9 @@ async function render() {
   else if (route.kind === 'entry') result = renderEntry(route.hash, route.chapter)
   else { showError(new Error('알 수 없는 경로')); return }
   await Promise.resolve(result)
+  if (myToken !== renderToken) return
   requestAnimationFrame(() => {
+    if (myToken !== renderToken) return
     applyLayoutPagination()
     updatePageIndicator()
   })
