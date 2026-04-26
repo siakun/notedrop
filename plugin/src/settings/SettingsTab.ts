@@ -1,14 +1,26 @@
-import { PluginSettingTab, Setting } from 'obsidian'
+import { Plugin, PluginSettingTab, Setting } from 'obsidian'
 import type { App } from 'obsidian'
-import type NotedropPlugin from '../main.js'
 import { deriveShareUrlBase } from './shareUrl.js'
 import { showPublishDiff } from '../commands/showPublishDiff.js'
-import { publishVault } from '../commands/publishVault.js'
+import { buildPublishDeps, publishVault } from '../commands/publishVault.js'
+import type { PluginContext } from '../services/PluginContext.js'
 
+/**
+ * Settings 탭. plugin instance 직접 의존하지 않고 PluginContext 만 사용.
+ *
+ * Obsidian 의 PluginSettingTab 이 super constructor 에 Plugin 객체를 요구
+ * 하므로 (UI 등록을 위해) main.ts 가 Plugin reference 를 별도 인자로 넘긴다.
+ * 단 비즈니스 호출은 모두 ctx 경유 — settings, dirty 추적, preview 토글,
+ * publish 명령어 호출 등.
+ */
 export class NotedropSettingTab extends PluginSettingTab {
   private revalidating = false
 
-  constructor(app: App, private plugin: NotedropPlugin) {
+  constructor(
+    app: App,
+    plugin: Plugin,
+    private readonly ctx: PluginContext
+  ) {
     super(app, plugin)
   }
 
@@ -21,8 +33,8 @@ export class NotedropSettingTab extends PluginSettingTab {
     if (this.revalidating) return
     this.revalidating = true
     try {
-      const before = this.plugin.hasUnpublishedChanges()
-      const after = await this.plugin.revalidateDirty()
+      const before = this.ctx.dirtyTracker.isDirty()
+      const after = await this.ctx.dirtyTracker.revalidate()
       if (before !== after && this.containerEl.isShown()) {
         this.render()
       }
@@ -53,17 +65,18 @@ export class NotedropSettingTab extends PluginSettingTab {
   private renderActions(containerEl: HTMLElement): void {
     containerEl.createEl('h3', { text: '액션' })
 
-    const dirty = this.plugin.hasUnpublishedChanges()
-    const indexCount = this.plugin.indexList().length
+    const dirty = this.ctx.dirtyTracker.isDirty()
+    const indexCount = this.ctx.index.list().length
+    const settings = this.ctx.settings
     const canPublish = dirty && indexCount > 0
-      && Boolean(this.plugin.settings.githubPat)
-      && Boolean(this.plugin.settings.targetRepo)
+      && Boolean(settings.githubPat)
+      && Boolean(settings.targetRepo)
     new Setting(containerEl)
       .setName('Publish to GitHub')
       .setDesc(
         indexCount === 0
           ? '공유된 노트가 없습니다. 노트 frontmatter 에 notedrop-publish: true 추가 후 발행 가능.'
-          : !this.plugin.settings.githubPat || !this.plugin.settings.targetRepo
+          : !settings.githubPat || !settings.targetRepo
             ? 'PAT 와 target repository 가 필요합니다 (아래 발행 설정 입력 후 활성화).'
             : dirty
               ? `변경 사항 있음 (${indexCount}개 항목). 클릭하면 GitHub 에 push.`
@@ -72,7 +85,7 @@ export class NotedropSettingTab extends PluginSettingTab {
       .addButton((btn) => {
         btn.setButtonText('변경 보기')
         if (indexCount === 0) btn.setDisabled(true)
-        btn.onClick(() => showPublishDiff(this.app, this.plugin))
+        btn.onClick(() => showPublishDiff(this.ctx))
       })
       .addButton((btn) => {
         btn.setButtonText(dirty ? '발행' : '발행됨')
@@ -82,8 +95,8 @@ export class NotedropSettingTab extends PluginSettingTab {
           btn.setDisabled(true)
           btn.setButtonText('발행 중…')
           try {
-            await publishVault(this.plugin.buildPublishDeps(), this.plugin.settings, {
-              isDirty: () => this.plugin.revalidateDirty()
+            await publishVault(buildPublishDeps(this.ctx), settings, {
+              isDirty: () => this.ctx.dirtyTracker.revalidate()
             })
           } finally {
             this.display()
@@ -91,7 +104,7 @@ export class NotedropSettingTab extends PluginSettingTab {
         })
       })
 
-    const previewStatus = this.plugin.previewStatus()
+    const previewStatus = this.ctx.preview.getStatus()
     const isRunning = previewStatus.state === 'running'
     const previewDesc = createFragment((frag) => {
       if (isRunning) {
@@ -116,7 +129,7 @@ export class NotedropSettingTab extends PluginSettingTab {
             .setWarning()
             .onClick(async () => {
               try {
-                await this.plugin.togglePreview(false)
+                await this.ctx.preview.stop()
               } catch (err) {
                 console.error('preview stop 실패', err)
               }
@@ -128,7 +141,7 @@ export class NotedropSettingTab extends PluginSettingTab {
             .setCta()
             .onClick(async () => {
               try {
-                await this.plugin.togglePreview(true)
+                await this.ctx.preview.start()
               } catch (err) {
                 console.error('preview start 실패', err)
               }
@@ -148,14 +161,14 @@ export class NotedropSettingTab extends PluginSettingTab {
         text.inputEl.type = 'password'
         text
           .setPlaceholder('github_pat_...')
-          .setValue(this.plugin.settings.githubPat)
+          .setValue(this.ctx.settings.githubPat)
           .onChange(async (value) => {
-            this.plugin.settings.githubPat = value.trim()
-            await this.plugin.saveSettings()
+            this.ctx.settings.githubPat = value.trim()
+            await this.ctx.saveSettings()
           })
       })
 
-    const pagesUrl = deriveShareUrlBase(this.plugin.settings.targetRepo)
+    const pagesUrl = deriveShareUrlBase(this.ctx.settings.targetRepo)
     const targetRepoDesc = createFragment((frag) => {
       frag.appendText('발행 대상 GitHub 레포 (형식: owner/repo).')
       if (pagesUrl) {
@@ -172,10 +185,10 @@ export class NotedropSettingTab extends PluginSettingTab {
       .addText((text) =>
         text
           .setPlaceholder('username/repo')
-          .setValue(this.plugin.settings.targetRepo)
+          .setValue(this.ctx.settings.targetRepo)
           .onChange(async (value) => {
-            this.plugin.settings.targetRepo = value.trim()
-            await this.plugin.saveSettings()
+            this.ctx.settings.targetRepo = value.trim()
+            await this.ctx.saveSettings()
           })
       )
 
@@ -189,10 +202,10 @@ export class NotedropSettingTab extends PluginSettingTab {
       .setDesc('Obsidian 시작 시 프리뷰 서버 자동 시작.')
       .addToggle((toggle) =>
         toggle
-          .setValue(this.plugin.settings.autoStartPreview)
+          .setValue(this.ctx.settings.autoStartPreview)
           .onChange(async (value) => {
-            this.plugin.settings.autoStartPreview = value
-            await this.plugin.saveSettings()
+            this.ctx.settings.autoStartPreview = value
+            await this.ctx.saveSettings()
           })
       )
   }
@@ -205,10 +218,10 @@ export class NotedropSettingTab extends PluginSettingTab {
       .setDesc('노트가 vault 에서 삭제되면 발행 인덱스에서도 자동 제거.')
       .addToggle((toggle) =>
         toggle
-          .setValue(this.plugin.settings.autoUnpublish)
+          .setValue(this.ctx.settings.autoUnpublish)
           .onChange(async (value) => {
-            this.plugin.settings.autoUnpublish = value
-            await this.plugin.saveSettings()
+            this.ctx.settings.autoUnpublish = value
+            await this.ctx.saveSettings()
           })
       )
   }
@@ -216,7 +229,7 @@ export class NotedropSettingTab extends PluginSettingTab {
   private renderSharedList(containerEl: HTMLElement): void {
     containerEl.createEl('h3', { text: '공유된 노트' })
     const list = containerEl.createEl('ul')
-    const items = this.plugin.indexList()
+    const items = this.ctx.index.list()
     if (items.length === 0) {
       list.createEl('li', { text: '아직 공유된 노트가 없습니다.' })
       return
@@ -242,10 +255,10 @@ export class NotedropSettingTab extends PluginSettingTab {
       .addText((text) =>
         text
           .setPlaceholder('main')
-          .setValue(this.plugin.settings.targetBranch)
+          .setValue(this.ctx.settings.targetBranch)
           .onChange(async (value) => {
-            this.plugin.settings.targetBranch = value.trim() || 'main'
-            await this.plugin.saveSettings()
+            this.ctx.settings.targetBranch = value.trim() || 'main'
+            await this.ctx.saveSettings()
           })
       )
 
@@ -255,22 +268,22 @@ export class NotedropSettingTab extends PluginSettingTab {
       .addText((text) =>
         text
           .setPlaceholder('(empty = root)')
-          .setValue(this.plugin.settings.publicRoot)
+          .setValue(this.ctx.settings.publicRoot)
           .onChange(async (value) => {
-            this.plugin.settings.publicRoot = value.trim().replace(/^\/|\/$/g, '')
-            await this.plugin.saveSettings()
+            this.ctx.settings.publicRoot = value.trim().replace(/^\/|\/$/g, '')
+            await this.ctx.saveSettings()
           })
       )
 
     new Setting(details)
       .setName('Publish viewer assets')
-      .setDesc('publish 마다 뷰어 (index.html/app.js/style.css) 도 같이 push. 별도 share repo 면 ON.')
+      .setDesc('publish 마다 뷰어 자산 (zip 풀어 모든 파일) 도 같이 push. 별도 share repo 면 ON.')
       .addToggle((toggle) =>
         toggle
-          .setValue(this.plugin.settings.publishViewerAssets)
+          .setValue(this.ctx.settings.publishViewerAssets)
           .onChange(async (value) => {
-            this.plugin.settings.publishViewerAssets = value
-            await this.plugin.saveSettings()
+            this.ctx.settings.publishViewerAssets = value
+            await this.ctx.saveSettings()
           })
       )
 
@@ -280,12 +293,12 @@ export class NotedropSettingTab extends PluginSettingTab {
       .addText((text) =>
         text
           .setPlaceholder('4321')
-          .setValue(String(this.plugin.settings.previewPort))
+          .setValue(String(this.ctx.settings.previewPort))
           .onChange(async (value) => {
             const n = Number.parseInt(value, 10)
             if (Number.isFinite(n) && n >= 1024 && n <= 65535) {
-              this.plugin.settings.previewPort = n
-              await this.plugin.saveSettings()
+              this.ctx.settings.previewPort = n
+              await this.ctx.saveSettings()
             }
           })
       )

@@ -1,6 +1,7 @@
 import { Notice } from 'obsidian'
 import type { App } from 'obsidian'
 import type { PreviewServer } from '../infrastructure/PreviewServer.js'
+import type { CommandDef } from './types.js'
 
 export async function startPreviewServer(
   _app: App,
@@ -42,4 +43,22 @@ export async function openPreviewInBrowser(
     return
   }
   window.open(status.url, '_blank')
+}
+
+export const startPreviewCommand: CommandDef = {
+  id: 'start-preview',
+  name: 'Start preview server',
+  callback: (ctx) => startPreviewServer(ctx.app, ctx.preview)
+}
+
+export const stopPreviewCommand: CommandDef = {
+  id: 'stop-preview',
+  name: 'Stop preview server',
+  callback: (ctx) => stopPreviewServer(ctx.app, ctx.preview)
+}
+
+export const openPreviewCommand: CommandDef = {
+  id: 'open-preview',
+  name: 'Open preview in browser',
+  callback: (ctx) => openPreviewInBrowser(ctx.app, ctx.preview)
 }

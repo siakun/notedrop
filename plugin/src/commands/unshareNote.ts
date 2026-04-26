@@ -1,6 +1,7 @@
 import { Notice } from 'obsidian'
 import type { App, TFile } from 'obsidian'
 import type { PublishIndex } from '../domain/PublishIndex.js'
+import type { CommandDef } from './types.js'
 
 export async function unshareNote(
   app: App,
@@ -16,4 +17,10 @@ export async function unshareNote(
   })
   index.remove(file.path)
   new Notice(`notedrop: "${(file as TFile).basename}" 공유 해제됨`)
+}
+
+export const unshareNoteCommand: CommandDef = {
+  id: 'unshare-note',
+  name: 'Unshare this note',
+  callback: (ctx) => unshareNote(ctx.app, ctx.index)
 }

@@ -46,3 +46,11 @@ class SharedListModal extends Modal {
 export function openSharedList(app: App, index: PublishIndex): void {
   new SharedListModal(app, index).open()
 }
+
+import type { CommandDef } from './types.js'
+
+export const openSharedListCommand: CommandDef = {
+  id: 'open-shared-list',
+  name: 'Open shared list',
+  callback: (ctx) => openSharedList(ctx.app, ctx.index)
+}

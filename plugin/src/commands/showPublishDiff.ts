@@ -1,8 +1,8 @@
 import { Modal, Notice } from 'obsidian'
-import type { App } from 'obsidian'
 import * as Diff from 'diff'
-import type NotedropPlugin from '../main.js'
 import type { PublishedFileSnapshot } from '../settings/PluginSettings.js'
+import type { PluginContext } from '../services/PluginContext.js'
+import type { CommandDef } from './types.js'
 
 type FileStatus = 'added' | 'modified' | 'removed'
 
@@ -19,8 +19,8 @@ class PublishDiffModal extends Modal {
   private entries: DiffEntry[] = []
   private activePath: string | null = null
 
-  constructor(app: App, private plugin: NotedropPlugin) {
-    super(app)
+  constructor(private readonly ctx: PluginContext) {
+    super(ctx.app)
     this.modalEl.addClass('notedrop-diff-modal')
   }
 
@@ -31,7 +31,7 @@ class PublishDiffModal extends Modal {
 
     let diff
     try {
-      diff = await this.plugin.computePublishDiff()
+      diff = await this.ctx.dirtyTracker.computeDiff()
     } catch (err) {
       loading.setText(`계산 실패: ${(err as Error).message}`)
       return
@@ -373,10 +373,16 @@ function appendWordCell(
   }
 }
 
-export function showPublishDiff(app: App, plugin: NotedropPlugin): void {
-  if (!plugin.indexList().length) {
+export function showPublishDiff(ctx: PluginContext): void {
+  if (!ctx.index.list().length) {
     new Notice('notedrop: 공유된 노트가 없습니다')
     return
   }
-  new PublishDiffModal(app, plugin).open()
+  new PublishDiffModal(ctx).open()
+}
+
+export const showPublishDiffCommand: CommandDef = {
+  id: 'show-publish-diff',
+  name: 'Show publish diff',
+  callback: (ctx) => showPublishDiff(ctx)
 }

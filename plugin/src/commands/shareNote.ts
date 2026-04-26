@@ -1,6 +1,7 @@
 import { Notice } from 'obsidian'
 import type { App, TFile } from 'obsidian'
 import type { PublishIndex } from '../domain/PublishIndex.js'
+import type { CommandDef } from './types.js'
 
 export async function shareNote(
   app: App,
@@ -16,4 +17,10 @@ export async function shareNote(
   })
   index.upsert(file.path)
   new Notice(`notedrop: "${(file as TFile).basename}" 공유됨`)
+}
+
+export const shareNoteCommand: CommandDef = {
+  id: 'share-note',
+  name: 'Share this note',
+  callback: (ctx) => shareNote(ctx.app, ctx.index)
 }

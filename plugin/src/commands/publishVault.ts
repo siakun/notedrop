@@ -17,6 +17,7 @@ import {
 import { unzipSync } from 'fflate'
 
 import viewerZipB64 from '../embedded/viewer.zip.b64'
+import type { CommandDef } from './types.js'
 
 const TEXT_EXTENSIONS = new Set([
   'html', 'htm', 'css', 'js', 'mjs', 'json', 'txt', 'md', 'svg', 'xml', 'map'
@@ -58,6 +59,35 @@ export async function publishVault(
     return
   }
   await executePublish(deps, settings)
+}
+
+export const publishVaultCommand: CommandDef = {
+  id: 'publish-vault',
+  name: 'Publish vault to GitHub',
+  callback: (ctx) =>
+    publishVault(buildPublishDeps(ctx), ctx.settings, {
+      isDirty: () => ctx.dirtyTracker.revalidate()
+    })
+}
+
+/**
+ * commands 가 PluginContext 에서 publish 의존을 추출하는 헬퍼. ctx 의 풀
+ * surface 가 아닌 publish 가 필요한 5 개 + onPublishSuccess 콜백만.
+ */
+export function buildPublishDeps(
+  ctx: import('../services/PluginContext.js').PluginContext
+): PublishDeps {
+  return {
+    app: ctx.app,
+    vault: ctx.vault,
+    index: ctx.index,
+    transformer: ctx.transformer,
+    manifestBuilder: ctx.manifestBuilder,
+    onPublishSuccess: async () => {
+      const snapshot = await ctx.dirtyTracker.computeSnapshot()
+      await ctx.dirtyTracker.confirmPublished(snapshot)
+    }
+  }
 }
 
 /**

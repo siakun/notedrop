@@ -3,6 +3,7 @@ import type { App } from 'obsidian'
 import type { PublishIndex } from '../domain/PublishIndex.js'
 import type { PluginSettings } from '../settings/PluginSettings.js'
 import { resolveShareUrlBase } from '../settings/shareUrl.js'
+import type { CommandDef } from './types.js'
 
 export async function copyShareUrl(
   app: App,
@@ -28,4 +29,10 @@ export async function copyShareUrl(
   const url = `${base}/#/${slugOrHash}/`
   await navigator.clipboard.writeText(url)
   new Notice(`복사됨: ${url}`)
+}
+
+export const copyShareUrlCommand: CommandDef = {
+  id: 'copy-share-url',
+  name: 'Copy share URL',
+  callback: (ctx) => copyShareUrl(ctx.app, ctx.index, ctx.settings)
 }

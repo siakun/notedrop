@@ -265,7 +265,13 @@ body {
   color: var(--color-accent-hover);
   background: rgba(35, 131, 226, 0.08);
 }
-.vs-layout-icon { font-size: 1.4rem; line-height: 1; letter-spacing: -0.05em; }
+.vs-layout-icon {
+  width: 2.8rem;
+  height: 2.8rem;
+  background: currentColor;
+  -webkit-mask: var(--layout-icon-url) center / contain no-repeat;
+  mask: var(--layout-icon-url) center / contain no-repeat;
+}
 .vs-layout-name { font-size: 0.78rem; text-align: center; }
 
 .vs-page-sizes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; }

@@ -1,6 +1,7 @@
 import { Notice } from 'obsidian'
 import type { PluginSettings } from '../settings/PluginSettings.js'
-import { executePublish, type PublishDeps } from './publishVault.js'
+import { buildPublishDeps, executePublish, type PublishDeps } from './publishVault.js'
+import type { CommandDef } from './types.js'
 
 /**
  * Force publish — dirty 게이트 우회. 변경 없어도 무조건 publish.
@@ -18,4 +19,10 @@ export async function forcePublishVault(
 ): Promise<void> {
   new Notice('notedrop: Force publish — dirty 체크 우회', 4000)
   await executePublish(deps, settings)
+}
+
+export const forcePublishVaultCommand: CommandDef = {
+  id: 'force-publish-vault',
+  name: 'Force publish vault to GitHub (변경 없어도 강제)',
+  callback: (ctx) => forcePublishVault(buildPublishDeps(ctx), ctx.settings)
 }

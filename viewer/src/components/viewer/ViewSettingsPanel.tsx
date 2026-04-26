@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { type CSSProperties, useEffect, useRef, useState } from 'react'
 import { useViewSettings } from '@/components/providers/ViewSettingsProvider'
 import {
   FONT_MAX,
@@ -20,11 +20,11 @@ import {
 } from '@/types/viewSettings'
 import { clamp, round1 } from '@/lib/paginate'
 
-const LAYOUT_OPTIONS: { value: LayoutMode; icon: string; label: string }[] = [
-  { value: 'default', icon: '≡', label: 'Default' },
-  { value: 'vertical', icon: '▭', label: 'Vertical Scroll' },
-  { value: 'horizontal', icon: '⇆', label: 'Horizontal Scroll' },
-  { value: 'two-pages', icon: '▭▭', label: 'Two Pages' }
+const LAYOUT_OPTIONS: { value: LayoutMode; iconUrl: string; label: string }[] = [
+  { value: 'default', iconUrl: '/icons/view-settings/layout-default.svg', label: 'Default' },
+  { value: 'vertical', iconUrl: '/icons/view-settings/layout-vertical.svg', label: 'Vertical Scroll' },
+  { value: 'horizontal', iconUrl: '/icons/view-settings/layout-horizontal.svg', label: 'Horizontal Scroll' },
+  { value: 'two-pages', iconUrl: '/icons/view-settings/layout-two-pages.svg', label: 'Two Pages' }
 ]
 
 const PAGE_SIZE_OPTIONS: PageSize[] = ['B4', 'A4', 'B5', 'A5']
@@ -111,9 +111,11 @@ export default function ViewSettingsPanel() {
                 aria-checked={settings.layout === opt.value}
                 onClick={() => patch({ layout: opt.value })}
               >
-                <span className="vs-layout-icon" aria-hidden="true">
-                  {opt.icon}
-                </span>
+                <span
+                  className="vs-layout-icon"
+                  style={{ '--layout-icon-url': `url(${opt.iconUrl})` } as CSSProperties}
+                  aria-hidden="true"
+                />
                 <span className="vs-layout-name">{opt.label}</span>
               </button>
             ))}
