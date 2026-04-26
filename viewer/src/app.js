@@ -266,7 +266,9 @@ function mmToPx(mm) { return mm * (96 / 25.4) }
 let stripController = null
 
 function applyLayoutPagination() {
-  // Always destroy old controller — even if no new entry-content
+  // Destroy old controller BEFORE the early return: when user navigates to home,
+  // there is no .entry-content but the previous controller's wheel/keydown listeners
+  // would otherwise linger and intercept input on the home view.
   if (stripController) { stripController.destroy(); stripController = null }
   const content = document.querySelector('.entry-content')
   if (!content) return
@@ -573,6 +575,10 @@ function connectLiveReload() {
       backoff = 500
       showLiveBadge('connected')
     })
+    // Coalesce concurrent SSE events: when many save events arrive in quick succession,
+    // only one reload runs; further events flip reloadPending so we re-run exactly once
+    // more after the in-flight reload finishes. Without this, parallel renders raced
+    // with click hashchange and could overwrite the entry view with a stale home render.
     const runReload = async () => {
       if (reloadRunning) { reloadPending = true; return }
       reloadRunning = true
@@ -641,6 +647,9 @@ async function loadManifest() {
   }
 }
 
+// Token pattern guards against overlapping renders (e.g. SSE live-reload mid-flight
+// when user clicks a card). If a newer render has started, the older one bails before
+// applying pagination so the newer entry isn't overwritten by the older home re-render.
 let renderToken = 0
 async function render() {
   const myToken = ++renderToken
