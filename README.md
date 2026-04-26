@@ -83,7 +83,7 @@
 | `Notedrop: Copy share URL` | `<shareUrlBase>/<slug 또는 hash>` 클립보드 복사 |
 | `Notedrop: Publish vault to GitHub` | 변환 → Tree API atomic commit |
 
-## 마크다운 지원 범위 (v1.0)
+## 마크다운 지원 범위 (v0.1 MVP)
 
 - 표준 마크다운 + GFM (표, 할 일, 인용)
 - 옵시디언 위키링크 `[[Note]]`, `[[Note|alt]]`
