@@ -110,11 +110,29 @@ export async function executePublish(
     // 변경 감지: lastPublishedFiles 와 비교해 변경된 path 만 push.
     // base_tree 가 변경 없는 path 자동 보존이라 blob/tree 등록 회수 절감.
     // force publish (skipChangeDetection=true) 는 일괄 push.
+    let pushReason = '변경 감지 우회 (force publish)'
     if (!deps.skipChangeDetection) {
       const diff = await deps.dirtyTracker.computeDiff()
-      if (diff.hasBaseline) {
+      if (!diff.hasBaseline) {
+        pushReason = '첫 publish (baseline 없음 — 일괄 push)'
+        console.log(
+          `notedrop publish: ${pushReason}. files=${totalFileCount}`
+        )
+      } else {
         const changedPaths = new Set([...diff.added, ...diff.modified])
         plan.files = plan.files.filter((f) => changedPaths.has(f.path))
+        pushReason = `변경 감지 (added ${diff.added.length}, modified ${diff.modified.length}, removed ${diff.removed.length})`
+        console.log(
+          `notedrop publish: ${pushReason}. files=${plan.files.length}/${totalFileCount}`
+        )
+        if (plan.files.length === totalFileCount && totalFileCount > 10) {
+          console.warn(
+            'notedrop publish: 모든 파일이 변경됨으로 분류 — baseline mismatch 가능 ' +
+            '(plugin update 또는 settings 변경 후 첫 publish?). 본 publish 후 baseline 갱신되어 ' +
+            '다음 publish 부터 변경된 파일만 push.'
+          )
+          pushReason = 'baseline mismatch — 일괄 push (다음 publish 부터 변경 감지 작동)'
+        }
       }
     }
 
@@ -129,8 +147,8 @@ export async function executePublish(
 
     startNotice.setMessage(
       plan.files.length === totalFileCount
-        ? `notedrop: ${plan.files.length} 파일 GitHub 에 push 중…`
-        : `notedrop: ${plan.files.length}/${totalFileCount} 파일 변경됨, push 중…`
+        ? `notedrop: ${plan.files.length} 파일 push 중 — ${pushReason}`
+        : `notedrop: ${plan.files.length}/${totalFileCount} 파일 변경됨, push 중`
     )
 
     const publisher = new GitHubPublisher({
