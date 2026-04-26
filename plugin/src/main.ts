@@ -58,9 +58,6 @@ export default class NotedropPlugin extends Plugin {
     )
     const bookAssembler = new BookAssembler(vault, meta)
     const bridge = new VaultEventBridge(meta, index)
-    const preview = new PreviewServer(orchestrator, vault, index, {
-      port: this.settings.previewPort
-    })
 
     const saveSettings = (): Promise<void> => this.saveSettings()
     const logger = new FileLogger({
@@ -77,6 +74,13 @@ export default class NotedropPlugin extends Plugin {
     const eventLogger = new EventLogger({
       logPath: eventLogPath,
       pluginVersion: PLUGIN_VERSION
+    })
+
+    const preview = new PreviewServer(orchestrator, vault, index, {
+      port: this.settings.previewPort,
+      onPreviewError: (category, msg, data) => {
+        void eventLogger.emit('preview_error', { category, msg, ...(data ?? {}) })
+      }
     })
 
     // === 신규: devSnapshot factory ===

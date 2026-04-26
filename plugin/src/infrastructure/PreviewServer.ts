@@ -11,6 +11,7 @@ import viewerZipB64 from '../embedded/viewer.zip.b64'
 export type PreviewServerOptions = {
   port?: number
   host?: string
+  onPreviewError?: (category: string, msg: string, data?: Record<string, unknown>) => void
 }
 
 export type PreviewServerStatus =
@@ -56,6 +57,11 @@ export class PreviewServer {
     private options: PreviewServerOptions = {}
   ) {}
 
+  private emitError(category: string, msg: string, data?: Record<string, unknown>): void {
+    console.error(`[preview] ${category}: ${msg}`, data ?? '')
+    this.options.onPreviewError?.(category, msg, data)
+  }
+
   getStatus(): PreviewServerStatus {
     return this.status
   }
@@ -65,11 +71,11 @@ export class PreviewServer {
     const port = this.options.port ?? 4321
     const host = this.options.host ?? '127.0.0.1'
 
-    this.viewerAssets = unpackViewerZip(viewerZipB64)
+    this.viewerAssets = unpackViewerZip(viewerZipB64, this.options.onPreviewError)
 
     const server = http.createServer((req, res) => {
       this.handle(req, res).catch((err) => {
-        console.error('notedrop preview: handler error', err)
+        this.emitError('handler', 'request handler error', { message: (err as Error).message })
         if (!res.headersSent) {
           res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' })
         }
@@ -296,21 +302,28 @@ function guessMime(filename: string): string {
   return MIME_BY_EXT[ext] ?? 'application/octet-stream'
 }
 
-function unpackViewerZip(b64: string): Map<string, Uint8Array> {
+function unpackViewerZip(
+  b64: string,
+  onError?: (category: string, msg: string, data?: Record<string, unknown>) => void
+): Map<string, Uint8Array> {
   const out = new Map<string, Uint8Array>()
   if (!b64 || !b64.trim()) return out
   let bytes: Uint8Array
   try {
     bytes = base64ToBytes(b64.trim())
   } catch (err) {
-    console.warn('notedrop preview: viewer.zip base64 decode 실패', err)
+    const msg = 'viewer.zip base64 decode 실패'
+    console.warn(`notedrop preview: ${msg}`, err)
+    onError?.('viewer_zip', msg, { message: (err as Error).message })
     return out
   }
   let entries: Record<string, Uint8Array>
   try {
     entries = unzipSync(bytes)
   } catch (err) {
-    console.warn('notedrop preview: viewer.zip 압축 해제 실패', err)
+    const msg = 'viewer.zip 압축 해제 실패'
+    console.warn(`notedrop preview: ${msg}`, err)
+    onError?.('viewer_zip', msg, { message: (err as Error).message })
     return out
   }
   for (const [path, content] of Object.entries(entries)) {
