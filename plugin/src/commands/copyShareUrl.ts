@@ -23,7 +23,8 @@ export async function copyShareUrl(
     return
   }
   const slugOrHash = item.slug ?? item.hash
-  const url = `${settings.shareUrlBase}/${slugOrHash}`
+  const base = settings.shareUrlBase.replace(/\/$/, '')
+  const url = `${base}/#/${slugOrHash}/`
   await navigator.clipboard.writeText(url)
   new Notice(`복사됨: ${url}`)
 }
