@@ -12,9 +12,15 @@ summary: 뷰어를 Next.js 가 아닌 vanilla SPA + esbuild 로 구현. 0 의존
 ---
 # ADR-0026: 뷰어 = vanilla SPA (Next.js 미사용)
 
-- **Status**: Accepted (2026-04-26)
-- **Supersedes**: spec §11.1.2 의 Next.js 'output: export' 채택 (부분 변경, M3 까지 한정)
+- **Status**: Proposed, 사용자 검토 필요 (2026-04-26 사용자가 spec §5.2/§11.1.2/§5.4 비호환 지적, 강등됨)
+- **Supersedes**: -- (보류, 사용자 승인 시까지 ADR-0011 이 표준)
 - **Superseded by**: -
+
+## 강등 사유 (2026-04-26 추가)
+
+본 ADR 의 채택 사유 본문에 "M4 단계 (autonomous run, 사용자 부재) 에서 Next.js 도입을 재평가" 라고 명시되어 있으나, 사용자 부재는 spec §5.2 의 macro 결정 (Next.js + React + unified.js pipeline) 을 자율로 뒤집을 권한이 아님을 사용자가 후속 세션에서 지적. 본래 brainstorming 단계에서 기록된 siakun.github.io 구조 차용 (Next.js App Router + components/ + markdown-pipeline/) 의 의도가 본 ADR 로 누락됨.
+
+본 ADR 은 사용자 명시 승인 시까지 정책상 무효. 코드는 보존하되 다음 세션은 spec §5.2 / ADR-0011 을 표준으로 따를 것. viewer 재작성은 별도 세션에서 사용자 동의 후 진행.
 
 ## Context
 

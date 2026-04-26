@@ -12,9 +12,13 @@ summary: 발행 메커니즘을 isomorphic-git clone/push 가 아닌 GitHub Git 
 ---
 # ADR-0027: 발행 메커니즘 = GitHub Git Data Tree API (isomorphic-git 미사용)
 
-- **Status**: Accepted (2026-04-26)
-- **Supersedes**: spec §5.1 / §5.4 의 IsomorphicGitClient 항목
+- **Status**: Proposed, 사용자 검토 필요 (2026-04-26 강등, 0026 과 같은 사유)
+- **Supersedes**: -- (보류, 사용자 승인 시까지 spec §5.1 IsomorphicGitClient 가 표준)
 - **Superseded by**: -
+
+## 강등 사유 (2026-04-26 추가)
+
+ADR-0026 과 함께 자율 세션에서 spec §5.1 의 라이브러리 선택 (isomorphic-git) 을 재평가하여 Tree API 로 변경. 결정 자체는 합리적 트레이드오프 (vault 사이드카 회피, 의존 없음, atomic commit) 가 있으나, **macro 라이브러리 선택을 사용자 승인 없이 자율 변경한 절차** 가 문제. 본 ADR 의 기술적 분석은 유효하므로 사용자가 검토 후 Accept 하면 그대로 채택, Reject 면 IsomorphicGitClient 로 재구현.
 
 ## Context
 
