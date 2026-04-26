@@ -20,11 +20,19 @@ import {
 } from '@/types/viewSettings'
 import { clamp, round1 } from '@/lib/paginate'
 
+// __NOTEDROP_BASE__ placeholder — plugin 의 PlanFactory.collectViewerFiles
+// 가 publish 시 사용자 share repo segment (예: /notedrop-share) 로 string
+// replace. PreviewServer 의 stripBasePath 도 같은 placeholder 처리. 이로써
+// 어떤 share repo 이름이든 SVG 가 viewer.zip 의 viewer/public/icons/... 와
+// 정확히 매핑.
+//
+// 사용자 hardcoded path 가 Next.js 의 자동 basePath prefix 를 받지 않으므로
+// 명시적으로 placeholder 박아 publish 시 변환되도록 함.
 const LAYOUT_OPTIONS: { value: LayoutMode; iconUrl: string; label: string }[] = [
-  { value: 'default', iconUrl: '/icons/view-settings/layout-default.svg', label: 'Default' },
-  { value: 'vertical', iconUrl: '/icons/view-settings/layout-vertical.svg', label: 'Vertical Scroll' },
-  { value: 'horizontal', iconUrl: '/icons/view-settings/layout-horizontal.svg', label: 'Horizontal Scroll' },
-  { value: 'two-pages', iconUrl: '/icons/view-settings/layout-two-pages.svg', label: 'Two Pages' }
+  { value: 'default', iconUrl: '/__NOTEDROP_BASE__/icons/view-settings/layout-default.svg', label: 'Default' },
+  { value: 'vertical', iconUrl: '/__NOTEDROP_BASE__/icons/view-settings/layout-vertical.svg', label: 'Vertical Scroll' },
+  { value: 'horizontal', iconUrl: '/__NOTEDROP_BASE__/icons/view-settings/layout-horizontal.svg', label: 'Horizontal Scroll' },
+  { value: 'two-pages', iconUrl: '/__NOTEDROP_BASE__/icons/view-settings/layout-two-pages.svg', label: 'Two Pages' }
 ]
 
 const PAGE_SIZE_OPTIONS: PageSize[] = ['B4', 'A4', 'B5', 'A5']

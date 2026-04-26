@@ -21,7 +21,7 @@ import { createPlanFactory } from './services/PlanFactory.js'
 import { FileLogger } from './services/Logger.js'
 import type { PluginContext } from './services/PluginContext.js'
 
-const PLUGIN_VERSION = '0.1.40'
+const PLUGIN_VERSION = '0.1.41'
 
 /**
  * Plugin entry. Hexagonal 정신상 main.ts 는:
