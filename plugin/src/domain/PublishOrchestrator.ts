@@ -73,6 +73,7 @@ export class PublishOrchestrator {
 
   private rebase(absolutePath: string): string {
     const trimmed = absolutePath.startsWith('/') ? absolutePath.slice(1) : absolutePath
+    if (this.publicRoot === '') return trimmed
     return `${this.publicRoot}/${trimmed}`
   }
 }

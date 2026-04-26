@@ -70,6 +70,20 @@ describe('PublishOrchestrator', () => {
     expect(plan.files.every((f) => f.path.startsWith('docs/'))).toBe(true)
   })
 
+  it('publicRoot 빈 값 → leading slash 없는 root 경로 (GitHub Tree API 호환)', async () => {
+    const o3 = new PublishOrchestrator(
+      vault,
+      index,
+      new ContentTransformer(new ContentResolver(vault, meta, index), index, vault),
+      new ManifestBuilder(index),
+      { publicRoot: '' }
+    )
+    const plan = await o3.plan()
+    expect(plan.files.every((f) => !f.path.startsWith('/'))).toBe(true)
+    expect(plan.files.some((f) => f.path === 'manifest.json')).toBe(true)
+    expect(plan.files.some((f) => f.kind === 'text' && f.path.match(/^content\/[a-f0-9-]+\/index\.md$/))).toBe(true)
+  })
+
   it('hash 기반 디렉터리 경로', async () => {
     const plan = await orchestrator.plan()
     const indexes = plan.files
