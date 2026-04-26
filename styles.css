@@ -1,5 +1,49 @@
 /* notedrop plugin styles */
 
+/* ─── Advanced collapsible section in Settings ───────────────────────── */
+
+.notedrop-advanced {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 0.5rem;
+}
+
+.notedrop-advanced > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  user-select: none;
+}
+
+.notedrop-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.notedrop-advanced > summary:hover {
+  color: var(--text-normal);
+}
+
+.notedrop-advanced-chevron {
+  display: inline-block;
+  transition: transform 0.15s ease;
+  font-size: 0.7rem;
+  color: var(--text-faint);
+}
+
+.notedrop-advanced[open] .notedrop-advanced-chevron {
+  transform: rotate(90deg);
+}
+
+.notedrop-advanced-label {
+  font-weight: 500;
+}
+
+
 /* ─── Publish diff modal ──────────────────────────────────────────────── */
 
 .notedrop-diff-modal {
