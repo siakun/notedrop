@@ -3,9 +3,10 @@ import {
   isSplittableElement,
   mapLineTextsToRanges,
   pickSplitLine,
-  splitElementAtCharIndex
+  splitElementAtCharIndex,
+  splitParagraph
 } from './paragraphSplit'
-import type { MeasureResult } from './paragraphSplit'
+import type { LineRangeMeasurer, MeasureResult, SplitMetrics } from './paragraphSplit'
 
 describe('isSplittableElement', () => {
   function el(tag: string): HTMLElement {
@@ -173,5 +174,73 @@ describe('mapLineTextsToRanges', () => {
 
   it('빈 lineTexts → 빈 결과', () => {
     expect(mapLineTextsToRanges('foo', [])).toEqual([])
+  })
+})
+
+function fakeMeasurer(perLineChars: number, lineHeight: number): LineRangeMeasurer {
+  return (text) => {
+    const lines = []
+    for (let i = 0; i < text.length; i += perLineChars) {
+      lines.push({ startIdx: i, endIdx: Math.min(i + perLineChars, text.length) })
+    }
+    return { lineHeight, lines }
+  }
+}
+
+const noopMetrics: SplitMetrics = { innerWidthPx: 500, innerHeightPx: 100 }
+
+describe('splitParagraph', () => {
+  it('splittable 아닌 element 는 그대로 단일 배열로 반환', () => {
+    const div = document.createElement('div')
+    div.textContent = 'foo'
+    const m = fakeMeasurer(2, 20)
+    expect(splitParagraph(div, noopMetrics, m)).toEqual([div])
+  })
+
+  it('전체가 페이지에 들어가면 그대로 단일 배열', () => {
+    const p = document.createElement('p')
+    p.textContent = 'short text'  // 10 chars / 2 per line = 5 lines × 20 = 100
+    const m = fakeMeasurer(2, 20)
+    const result = splitParagraph(p, { innerWidthPx: 500, innerHeightPx: 100 }, m)
+    expect(result).toEqual([p])
+  })
+
+  it('초과 시 줄 단위로 다중 element 분할', () => {
+    const p = document.createElement('p')
+    p.textContent = 'ABCDEFGHIJ'  // 10 chars / 2 per line = 5 lines
+    const m = fakeMeasurer(2, 20)
+    // innerHeight=40 → 2 줄까지 들어감 = 4 chars. 10 → 4 / 4 / 2 (3 단락).
+    const result = splitParagraph(p, { innerWidthPx: 500, innerHeightPx: 40 }, m)
+    expect(result.length).toBe(3)
+    expect(result[0]!.textContent).toBe('ABCD')
+    expect(result[1]!.textContent).toBe('EFGH')
+    expect(result[2]!.textContent).toBe('IJ')
+  })
+
+  it('text 가 비어 있으면 그대로 단일 배열', () => {
+    const p = document.createElement('p')
+    const m = fakeMeasurer(2, 20)
+    expect(splitParagraph(p, noopMetrics, m)).toEqual([p])
+  })
+
+  it('measurer 가 throw 하면 원본 그대로 (fallback)', () => {
+    const p = document.createElement('p')
+    p.textContent = 'ABCDEFGHIJ'
+    const failing: LineRangeMeasurer = () => {
+      throw new Error('canvas unavailable')
+    }
+    const result = splitParagraph(p, { innerWidthPx: 500, innerHeightPx: 40 }, failing)
+    expect(result).toEqual([p])
+  })
+
+  it('재귀 depth 제한 — 무한 split 가드', () => {
+    const p = document.createElement('p')
+    p.textContent = 'A'.repeat(1000)
+    const stuck: LineRangeMeasurer = (text) => ({
+      lineHeight: 100,
+      lines: text.split('').map((_, i) => ({ startIdx: i, endIdx: i + 1 }))
+    })
+    const result = splitParagraph(p, { innerWidthPx: 500, innerHeightPx: 50 }, stuck)
+    expect(result.length).toBeLessThanOrEqual(1000)
   })
 })

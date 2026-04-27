@@ -208,6 +208,68 @@ function toPretextWordBreak(wb: string): WordBreakMode {
 }
 
 /**
+ * element 의 computed style 에서 pretext 입력용 FontStyle 추출. DOM 의존이라
+ * 단위 테스트에서 직접 호출 안 함 — splitParagraph 의 통합 단계에서만 사용.
+ */
+function readFontStyle(el: HTMLElement): FontStyle {
+  const cs = el.ownerDocument.defaultView!.getComputedStyle(el)
+  const fontSize = parseFloat(cs.fontSize) || 16
+  return {
+    fontFamily: cs.fontFamily,
+    fontSize,
+    fontWeight: cs.fontWeight,
+    fontStyle: cs.fontStyle,
+    lineHeight: parseFloat(cs.lineHeight) || fontSize * 1.5,
+    letterSpacing: parseFloat(cs.letterSpacing) || 0,
+    whiteSpace: cs.whiteSpace,
+    wordBreak: cs.wordBreak
+  }
+}
+
+/**
+ * 단일 element 분할. splittable 아니거나 fits 면 [el] 반환. 초과 시 재귀로 다수
+ * element 반환. measurer 실패 시 [el] fallback. 재귀 depth 제한 (MAX_SPLIT_RECURSION)
+ * 으로 무한 루프 가드.
+ *
+ * @param measurer DI — 단위 테스트에서 fake 주입. production 은 createPretextMeasurer().
+ */
+export function splitParagraph(
+  el: HTMLElement,
+  metrics: SplitMetrics,
+  measurer: LineRangeMeasurer
+): HTMLElement[] {
+  if (!isSplittableElement(el)) return [el]
+  return splitParagraphRec(el, metrics, measurer, 0)
+}
+
+function splitParagraphRec(
+  el: HTMLElement,
+  metrics: SplitMetrics,
+  measurer: LineRangeMeasurer,
+  depth: number
+): HTMLElement[] {
+  if (depth >= MAX_SPLIT_RECURSION) return [el]
+
+  const text = el.textContent ?? ''
+  if (text.length === 0) return [el]
+
+  let measured: MeasureResult
+  try {
+    measured = measurer(text, readFontStyle(el), metrics.innerWidthPx)
+  } catch {
+    return [el]
+  }
+
+  const splitAt = pickSplitLine(measured, metrics.innerHeightPx)
+  if (splitAt === null) return [el]
+
+  const tail = splitElementAtCharIndex(el, splitAt)
+  if (!tail) return [el]
+
+  return [el, ...splitParagraphRec(tail, metrics, measurer, depth + 1)]
+}
+
+/**
  * pretext 호출의 단일 진입점. 다른 함수는 LineRangeMeasurer 인터페이스만 사용
  * — 이 어댑터를 fake 로 교체 가능. canvas 부재 환경 (jsdom) 에서 실행 시
  * 호출자가 try/catch 로 fallback.
