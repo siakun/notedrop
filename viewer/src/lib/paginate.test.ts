@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clamp, mmToPx, paginateVertical, round1 } from './paginate'
-import { VS_DEFAULTS } from '@/types/viewSettings'
+import { clamp, mmToPx, round1 } from './paginate'
 
 describe('mmToPx', () => {
   it('mm → px 변환 (96 DPI)', () => {
@@ -28,31 +27,6 @@ describe('round1', () => {
   })
 })
 
-describe('paginateVertical (회귀)', () => {
-  // jsdom 에서 pretext canvas 부재 → buildLineStream 의 measurer throw →
-  // element 단위 1 line fallback. 짧은 단락은 short-paragraph gate (offsetHeight
-  // ≤ lineHeight×1.5) 통과 → measure skip + 1 line.
-
-  it('짧은 단락 1개 → 단일 paper-page 1개', () => {
-    const content = document.createElement('div')
-    const p = document.createElement('p')
-    p.textContent = 'short'
-    content.appendChild(p)
-    document.body.appendChild(content)
-
-    paginateVertical(content, { ...VS_DEFAULTS, layout: 'vertical', pageSize: 'A4' })
-
-    const pages = content.querySelectorAll('.paper-page')
-    expect(pages.length).toBe(1)
-    expect(pages[0]!.textContent).toBe('short')
-    document.body.removeChild(content)
-  })
-
-  it('빈 content → no-op', () => {
-    const content = document.createElement('div')
-    document.body.appendChild(content)
-    paginateVertical(content, { ...VS_DEFAULTS, layout: 'vertical', pageSize: 'A4' })
-    expect(content.children.length).toBe(0)
-    document.body.removeChild(content)
-  })
-})
+// paginateVertical 단위 테스트는 v0.1.59 에서 폐기 — paginateVertical 함수 자체
+// 폐기 (PaginatedView 컴포넌트가 대체). computeLayout 의 단위 테스트는 향후 추가
+// (DOM mock + measurer 주입).

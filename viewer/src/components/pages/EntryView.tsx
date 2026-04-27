@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useCallback, useEffect, useMemo, type CSSProperties } from 'react'
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer'
-import { useViewSettings } from '@/stores/viewerStore'
+import PaginatedView from '@/components/pagination/PaginatedView'
 import { useContent } from '@/hooks/useContent'
 import { useCustomCss } from '@/hooks/useCustomCss'
-import { useLayoutPagination } from '@/hooks/useLayoutPagination'
+import { computeLayout, computePageFit } from '@/lib/paginate'
+import { useSetLayoutResult, useViewSettings } from '@/stores/viewerStore'
 import type { ManifestItem } from '@/types/manifest'
 import type { Manifest } from '@/types/manifest'
 import Toc from '@/components/book/Toc'
@@ -19,12 +20,23 @@ export type EntryViewProps = {
   renderToken: number
 }
 
+const MEASURE_CONTAINER_STYLE: CSSProperties = {
+  position: 'absolute',
+  left: '-99999px',
+  top: 0,
+  visibility: 'hidden',
+  pointerEvents: 'none'
+}
+
 /**
  * Entry 본문 렌더 + 페이지네이션 + customCss + book 모드 chapter 네비.
  *
- * 핵심 책임은 *조합*: hook 들 (useContent, useCustomCss, useLayoutPagination)
- * 의 결과를 props 로 MarkdownRenderer + Toc + ChapterNav 에 전달. 페이지네이션
- * 알고리즘 + customCss 주입 등 *순수 로직* 은 모두 hook 안에.
+ * layout='default' 면 markdown 결과 그대로. 그 외 layout 은 *off-screen measure
+ * container* 안 markdown 렌더 → handleContentReady 시점에 computeLayout → store
+ * dispatch → PaginatedView 가 store.pages 기반 visible render.
+ *
+ * cloneNode + innerHTML reset 흐름은 PaperPage 컴포넌트 안. React reconciliation
+ * 활용 (페이지 component 별 useLayoutEffect, sourceGroups reference 변경 시 재배치).
  */
 export default function EntryView({
   entry,
@@ -38,14 +50,17 @@ export default function EntryView({
   const targetHash = target.hash
   const { content, error } = useContent(targetHash)
   const settings = useViewSettings()
+  const setLayoutResult = useSetLayoutResult()
 
-  // settings 가 변경되면 MarkdownRenderer 의 key 가 바뀌어 unmount + remount
-  // → 새 paginate trigger. 사용자 노트 콘텐츠 변경 (renderToken) 도 같이.
+  const isPaginate = settings.layout !== 'default'
+
+  // settings 변경 시 MarkdownRenderer key 갱신 → unmount + remount → 새 onContentReady.
   const renderKey = useMemo(
     () =>
       `${targetHash}:${renderToken}:${settings.layout}:${settings.pageSize}` +
       `:${settings.marginTop}:${settings.marginBottom}` +
-      `:${settings.marginLeft}:${settings.marginRight}`,
+      `:${settings.marginLeft}:${settings.marginRight}` +
+      `:${settings.fontScale}:${settings.lineScale}:${settings.font}`,
     [
       targetHash,
       renderToken,
@@ -54,12 +69,49 @@ export default function EntryView({
       settings.marginTop,
       settings.marginBottom,
       settings.marginLeft,
-      settings.marginRight
+      settings.marginRight,
+      settings.fontScale,
+      settings.lineScale,
+      settings.font
     ]
   )
 
+  // measure paper-page 의 inline size — visible PaperPage 와 동일해야 측정 정확.
+  // vertical mm 모드 (Auto X) 는 CSS variable 사용 → fit null 이라 inline 적용 X.
+  // 그 외는 computePageFit 의 viewport-fit 값 inline.
+  const measurePaperStyle = useMemo<CSSProperties | undefined>(() => {
+    if (!isPaginate) return undefined
+    if (settings.layout === 'vertical' && settings.pageSize !== 'Auto') {
+      // CSS variable 의 width/height/padding 자동 적용 — inline 안 함.
+      return undefined
+    }
+    const fit = computePageFit(settings, settings.layout)
+    if (!fit) return undefined
+    return {
+      width: `${fit.width}px`,
+      height: `${fit.height}px`,
+      padding: `${fit.padTop}px ${fit.padRight}px ${fit.padBottom}px ${fit.padLeft}px`
+    }
+  }, [isPaginate, settings])
+
   useCustomCss(targetHash, content?.frontmatter.customCss ?? null)
-  const { handleContentReady } = useLayoutPagination(settings)
+
+  // markdown 렌더 완료 시점 → measure → store dispatch.
+  const handleContentReady = useCallback(
+    (root: HTMLElement) => {
+      if (!isPaginate) return
+      const result = computeLayout(root, settings, settings.layout)
+      setLayoutResult(result.pages, result.fit)
+    },
+    [isPaginate, settings, setLayoutResult]
+  )
+
+  // layout='default' 진입 시 store 의 pages 비움 (PaginatedView 미사용).
+  useEffect(() => {
+    if (!isPaginate) {
+      setLayoutResult([], null)
+    }
+  }, [isPaginate, setLayoutResult])
 
   if (error) {
     return <div className="error">콘텐츠 로드 실패: {error.message}</div>
@@ -71,15 +123,40 @@ export default function EntryView({
   const showCover = !chapter && entry.cover
   const isBook = entry.render === 'book'
 
+  const measureMarkdown = isPaginate ? (
+    <div aria-hidden="true" style={MEASURE_CONTAINER_STYLE}>
+      <section className="paper-page" style={measurePaperStyle}>
+        <MarkdownRenderer
+          key={renderKey}
+          body={content.body}
+          pageHash={targetHash}
+          onContentReady={handleContentReady}
+        />
+      </section>
+    </div>
+  ) : null
+
+  const visibleMarkdown = isPaginate ? (
+    <PaginatedView layout={settings.layout} />
+  ) : (
+    <MarkdownRenderer
+      key={renderKey}
+      body={content.body}
+      pageHash={targetHash}
+    />
+  )
+
   if (isBook) {
     const idx = chapter
       ? chapters.findIndex((c) => c.hash === chapter.hash)
       : -1
     const prev = idx > 0 ? chapters[idx - 1]! : null
-    const next = idx >= 0 && idx < chapters.length - 1 ? chapters[idx + 1]! : null
+    const next =
+      idx >= 0 && idx < chapters.length - 1 ? chapters[idx + 1]! : null
 
     return (
       <>
+        {measureMarkdown}
         <Toc
           book={entry}
           chapters={chapters}
@@ -87,14 +164,13 @@ export default function EntryView({
         />
         <article>
           {showCover && entry.cover && (
-            <img className="cover" src={normalizeAsset(entry.cover)} alt={`${entry.title} 표지`} />
+            <img
+              className="cover"
+              src={normalizeAsset(entry.cover)}
+              alt={`${entry.title} 표지`}
+            />
           )}
-          <MarkdownRenderer
-            key={renderKey}
-            body={content.body}
-            pageHash={targetHash}
-            onContentReady={handleContentReady}
-          />
+          {visibleMarkdown}
           <ChapterNav book={entry} prev={prev} next={next} />
         </article>
       </>
@@ -102,17 +178,19 @@ export default function EntryView({
   }
 
   return (
-    <article>
-      {showCover && entry.cover && (
-        <img className="cover" src={normalizeAsset(entry.cover)} alt={`${entry.title} 표지`} />
-      )}
-      <MarkdownRenderer
-        key={renderKey}
-        body={content.body}
-        pageHash={targetHash}
-        onContentReady={handleContentReady}
-      />
-    </article>
+    <>
+      {measureMarkdown}
+      <article>
+        {showCover && entry.cover && (
+          <img
+            className="cover"
+            src={normalizeAsset(entry.cover)}
+            alt={`${entry.title} 표지`}
+          />
+        )}
+        {visibleMarkdown}
+      </article>
+    </>
   )
 }
 

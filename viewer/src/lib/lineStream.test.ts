@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   buildLineStream,
   groupLinesBySource,
-  renderLineGroups,
   splitByLineHeight
 } from './lineStream'
 import type { Line, LineRangeMeasurer } from './lineStream'
@@ -237,109 +236,5 @@ describe('groupLinesBySource', () => {
   })
 })
 
-describe('renderLineGroups', () => {
-  it('한 page group — same source 의 모든 line → source 그대로 (텍스트 보존)', () => {
-    const parent = document.createElement('div')
-    const p = document.createElement('p')
-    p.textContent = 'ABCDEFGHIJ'
-    parent.appendChild(p)
-    document.body.appendChild(parent)
-
-    const lines: Line[] = [
-      L({ source: p, charStart: 0, charEnd: 5, splittable: true }),
-      L({ source: p, charStart: 5, charEnd: 10, splittable: true })
-    ]
-    renderLineGroups(parent, [lines])
-    const pages = parent.querySelectorAll('.paper-page')
-    expect(pages.length).toBe(1)
-    expect(pages[0]!.children.length).toBe(1)
-    expect(pages[0]!.firstElementChild?.textContent).toBe('ABCDEFGHIJ')
-    document.body.removeChild(parent)
-  })
-
-  it('두 page — 같은 source 가 split 되면 element 도 split', () => {
-    const parent = document.createElement('div')
-    const p = document.createElement('p')
-    p.textContent = 'ABCDEFGHIJ'
-    parent.appendChild(p)
-    document.body.appendChild(parent)
-
-    const lines: Line[] = [
-      L({ source: p, charStart: 0, charEnd: 5, splittable: true }),
-      L({ source: p, charStart: 5, charEnd: 10, splittable: true })
-    ]
-    renderLineGroups(parent, [lines.slice(0, 1), lines.slice(1)])
-    const pages = parent.querySelectorAll('.paper-page')
-    expect(pages.length).toBe(2)
-    expect(pages[0]!.firstElementChild?.textContent).toBe('ABCDE')
-    expect(pages[1]!.firstElementChild?.textContent).toBe('FGHIJ')
-    document.body.removeChild(parent)
-  })
-
-  it('non-splittable element 는 한 page 에만 위치 (heading)', () => {
-    const parent = document.createElement('div')
-    const h = document.createElement('h2')
-    h.textContent = '제목'
-    parent.appendChild(h)
-    document.body.appendChild(parent)
-
-    const lines: Line[] = [
-      L({
-        source: h,
-        charStart: -1,
-        charEnd: -1,
-        splittable: false,
-        kind: 'heading',
-        breakAfterAvoid: true
-      })
-    ]
-    renderLineGroups(parent, [lines])
-    const pages = parent.querySelectorAll('.paper-page')
-    expect(pages.length).toBe(1)
-    expect(pages[0]!.firstElementChild?.tagName).toBe('H2')
-    document.body.removeChild(parent)
-  })
-
-  it('list-item 들은 새 <ul> 으로 wrap', () => {
-    const parent = document.createElement('div')
-    parent.innerHTML = '<ul><li>A</li><li>B</li></ul>'
-    document.body.appendChild(parent)
-    const ul = parent.firstElementChild as HTMLElement
-    const liA = ul.children[0] as HTMLElement
-    const liB = ul.children[1] as HTMLElement
-
-    const lines: Line[] = [
-      L({
-        source: liA,
-        charStart: -1,
-        charEnd: -1,
-        splittable: false,
-        kind: 'list-item'
-      }),
-      L({
-        source: liB,
-        charStart: -1,
-        charEnd: -1,
-        splittable: false,
-        kind: 'list-item'
-      })
-    ]
-    renderLineGroups(parent, [lines])
-    const pages = parent.querySelectorAll('.paper-page')
-    expect(pages.length).toBe(1)
-    const newUl = pages[0]!.firstElementChild
-    expect(newUl?.tagName).toBe('UL')
-    expect(newUl?.children.length).toBe(2)
-    expect(newUl?.children[0]?.textContent).toBe('A')
-    document.body.removeChild(parent)
-  })
-
-  it('빈 group 도 paper-page 1개 생성 (페이지 indicator 일관성)', () => {
-    const parent = document.createElement('div')
-    document.body.appendChild(parent)
-    renderLineGroups(parent, [[]])
-    const pages = parent.querySelectorAll('.paper-page')
-    expect(pages.length).toBe(1)
-    document.body.removeChild(parent)
-  })
-})
+// renderLineGroups 의 단위 테스트는 v0.1.59 에서 폐기 — PaperPage 컴포넌트가
+// 대체. 컴포넌트 단위 테스트는 향후 추가 (jsdom + React testing-library).
