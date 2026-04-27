@@ -30,7 +30,15 @@ const LAYOUT_OPTIONS: { value: LayoutMode; iconUrl: string; label: string }[] = 
   { value: 'two-pages', iconUrl: withBase('/icons/view-settings/layout-two-pages.svg'), label: 'Two Pages' }
 ]
 
-const PAGE_SIZE_OPTIONS: PageSize[] = ['B4', 'A4', 'B5', 'A5']
+const PAGE_SIZE_OPTIONS: PageSize[] = ['auto', 'B4', 'A4', 'B5', 'A5']
+
+const PAGE_SIZE_LABELS: Record<PageSize, string> = {
+  auto: 'Auto',
+  B4: 'B4',
+  A4: 'A4',
+  B5: 'B5',
+  A5: 'A5'
+}
 
 const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: 'day', label: 'Day' },
@@ -137,7 +145,7 @@ export default function ViewSettingsPanel() {
                   aria-checked={settings.pageSize === sz}
                   onClick={() => patch({ pageSize: sz })}
                 >
-                  {sz}
+                  {PAGE_SIZE_LABELS[sz]}
                 </button>
               ))}
             </div>

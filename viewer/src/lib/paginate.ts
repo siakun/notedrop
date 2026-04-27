@@ -30,6 +30,12 @@ export type PageFit = {
   gap: number
 }
 
+/**
+ * 페이지 크기 결정. pageSize='auto' 또는 mm 단위 크기가 viewport 보다 크면
+ * viewport-fit 적용. mm 단위 + viewport 안 들어맞으면 그대로 mm 사용.
+ *
+ * 모든 layout 에서 동일 알고리즘 — 일관성 의무 (사용자 결정 v0.1.53).
+ */
 export function computePageFit(
   settings: ViewSettings,
   layout: LayoutMode
@@ -50,22 +56,36 @@ export function computePageFit(
   const gap = 16
   const horizPaddingExtra = 32
 
-  let pageHeight = viewportH - 32
-  let pageWidth = pageHeight * ratio
+  let pageWidth: number
+  let pageHeight: number
 
-  if (layout === 'two-pages') {
-    const widthBudget = (viewportW - gap - horizPaddingExtra * 2) / 2
-    if (widthBudget < pageWidth) {
-      pageWidth = widthBudget
-      pageHeight = pageWidth / ratio
-    }
+  if (settings.pageSize === 'auto') {
+    // viewport-fit (기존 horizontal/two-pages 동작)
+    pageHeight = viewportH - 32
+    pageWidth = pageHeight * ratio
   } else {
-    const widthBudget = viewportW - horizPaddingExtra * 2
-    if (widthBudget < pageWidth) {
-      pageWidth = widthBudget
-      pageHeight = pageWidth / ratio
-    }
+    // mm 단위 시도
+    pageWidth = mmToPx(dims.w)
+    pageHeight = mmToPx(dims.h)
   }
+
+  // width budget 검사 — viewport 가 작으면 fit
+  const widthBudget =
+    layout === 'two-pages'
+      ? (viewportW - gap - horizPaddingExtra * 2) / 2
+      : viewportW - horizPaddingExtra * 2
+  if (widthBudget < pageWidth) {
+    pageWidth = widthBudget
+    pageHeight = pageWidth / ratio
+  }
+
+  // height budget 검사 — viewport 가 작으면 fit (mm 단위가 viewport 보다 큰 케이스)
+  const heightBudget = viewportH - 32
+  if (heightBudget < pageHeight) {
+    pageHeight = heightBudget
+    pageWidth = pageHeight * ratio
+  }
+
   if (pageHeight <= 0 || pageWidth <= 0) return null
 
   const scale = pageHeight / mmToPx(dims.h)
@@ -132,25 +152,37 @@ export function unpaginate(content: HTMLElement): void {
  *   2. buildLineStream → element 들을 Line[] 으로 분해
  *   3. splitByLineHeight → Line[] → page groups
  *   4. renderLineGroups → 각 group 마다 paper-page 생성 + line 들을 source 별로 다시 묶음
+ *
+ * pageSize === 'auto' 인 경우 mm 고정 대신 computePageFit 결과 (viewport-fit) 를
+ * 사용하고 paper-page 에 inline style 로 width/height/padding 적용.
  */
 export function paginateVertical(
   content: HTMLElement,
   settings: ViewSettings
 ): void {
-  const dims = PAGE_DIMS[settings.pageSize]
-  const innerHeightPx = mmToPx(
-    dims.h - settings.marginTop - settings.marginBottom
-  )
-  const innerWidthPx = mmToPx(
-    dims.w - settings.marginLeft - settings.marginRight
-  )
-  if (innerHeightPx <= 0 || innerWidthPx <= 0) return
-
   const flat = Array.from(content.children) as HTMLElement[]
   if (flat.length === 0) return
 
-  // measure 컨테이너 — paper-page 안에 children 임시 배치 → computed style + offsetHeight 측정
+  let innerHeightPx: number
+  let innerWidthPx: number
+  let fit: PageFit | null = null
+
+  if (settings.pageSize === 'auto') {
+    fit = computePageFit(settings, 'vertical')
+    if (!fit) return
+    innerHeightPx = fit.innerHeight
+    innerWidthPx = fit.width - fit.padLeft - fit.padRight
+  } else {
+    const dims = PAGE_DIMS[settings.pageSize]
+    innerHeightPx = mmToPx(dims.h - settings.marginTop - settings.marginBottom)
+    innerWidthPx = mmToPx(dims.w - settings.marginLeft - settings.marginRight)
+  }
+  if (innerHeightPx <= 0 || innerWidthPx <= 0) return
+
+  // measure 컨테이너 — paper-page 안에 children 임시 배치 → computed style + offsetHeight 측정.
+  // 'auto' 인 경우 fit 적용 — measure 컨테이너의 width/height 도 fit 결과로 set.
   const measure = createPaperPage()
+  if (fit) applyFitDims(measure, fit)
   for (const child of flat) measure.appendChild(child)
   content.innerHTML = ''
   content.appendChild(measure)
@@ -161,7 +193,19 @@ export function paginateVertical(
     createPretextMeasurer()
   )
   const lineGroups = splitByLineHeight(lineStream, innerHeightPx)
-  renderLineGroups(content, lineGroups)
+
+  // renderLineGroups 가 paper-page 들을 content 에 직접 만든 후 'auto' 면 fit 적용.
+  if (fit) {
+    const tmp = document.createElement('div')
+    renderLineGroups(tmp, lineGroups)
+    content.innerHTML = ''
+    for (const page of Array.from(tmp.children)) {
+      if (page instanceof HTMLElement) applyFitDims(page, fit)
+      content.appendChild(page)
+    }
+  } else {
+    renderLineGroups(content, lineGroups)
+  }
 }
 
 export type StripPagination = {

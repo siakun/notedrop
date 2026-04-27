@@ -1,6 +1,6 @@
 export type Theme = 'day' | 'sepia' | 'night'
 export type LayoutMode = 'default' | 'vertical' | 'horizontal' | 'two-pages'
-export type PageSize = 'B4' | 'A4' | 'B5' | 'A5'
+export type PageSize = 'auto' | 'B4' | 'A4' | 'B5' | 'A5'
 export type FontKey =
   | 'system'
   | 'arial'
@@ -40,7 +40,11 @@ export const VS_DEFAULTS: ViewSettings = {
   align: 'left'
 }
 
+/**
+ * 페이지 mm 크기. auto 는 fit 계산용 ratio 만 사용 (실 크기는 viewport 에 맞춤).
+ */
 export const PAGE_DIMS: Record<PageSize, { w: number; h: number }> = {
+  auto: { w: 210, h: 297 },  // A4 ratio (fit 알고리즘의 ratio 입력으로만 사용)
   B4: { w: 257, h: 364 },
   A4: { w: 210, h: 297 },
   B5: { w: 182, h: 257 },

@@ -274,7 +274,7 @@ body {
 }
 .vs-layout-name { font-size: 0.78rem; text-align: center; }
 
-.vs-page-sizes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; }
+.vs-page-sizes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.3rem; }
 .vs-page-size {
   background: var(--color-bg);
   color: var(--color-text);

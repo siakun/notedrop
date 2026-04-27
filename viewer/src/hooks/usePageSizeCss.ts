@@ -18,11 +18,15 @@ export function usePageSizeCss(): void {
   useEffect(() => {
     if (typeof document === 'undefined') return
     const root = document.documentElement.style
-    const dims = PAGE_DIMS[settings.pageSize]
-    root.setProperty('--page-width-mm', `${dims.w}mm`)
-    root.setProperty('--page-height-mm', `${dims.h}mm`)
-    root.setProperty('--page-width-px', `${mmToPx(dims.w)}px`)
-    root.setProperty('--page-height-px', `${mmToPx(dims.h)}px`)
+    // 'auto' 면 mm 단위 CSS variable 무관 — paginate 가 inline style 로 fit 결과
+    // 적용. 기존 variable 도 유지 (다른 layout 에서 참조하면 문제 없게 last 값 그대로).
+    if (settings.pageSize !== 'auto') {
+      const dims = PAGE_DIMS[settings.pageSize]
+      root.setProperty('--page-width-mm', `${dims.w}mm`)
+      root.setProperty('--page-height-mm', `${dims.h}mm`)
+      root.setProperty('--page-width-px', `${mmToPx(dims.w)}px`)
+      root.setProperty('--page-height-px', `${mmToPx(dims.h)}px`)
+    }
     root.setProperty('--page-margin-top-mm', `${settings.marginTop}mm`)
     root.setProperty('--page-margin-bottom-mm', `${settings.marginBottom}mm`)
     root.setProperty('--page-margin-left-mm', `${settings.marginLeft}mm`)
