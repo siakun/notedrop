@@ -90,3 +90,60 @@ export function pickSplitLine(
   const idx = Math.min(safeCount, lines.length) - 1
   return lines[idx]!.endIdx
 }
+
+/**
+ * el 안의 textNode 들을 in-order 순회하며 누적 char count 가 target 에 도달한
+ * (textNode, offset) 을 반환.
+ */
+function locateCharBoundary(
+  el: HTMLElement,
+  target: number
+): { node: Text; offset: number } | null {
+  const walker = el.ownerDocument.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+  let acc = 0
+  let node = walker.nextNode() as Text | null
+  while (node) {
+    const len = node.data.length
+    if (acc + len >= target) {
+      return { node, offset: target - acc }
+    }
+    acc += len
+    node = walker.nextNode() as Text | null
+  }
+  return null
+}
+
+/**
+ * element 안의 char count 가 charIndex 인 위치를 boundary 로 element 를 split.
+ *
+ * pretext / measure 와 무관한 순수 DOM 함수. textNode 누적 char count 로 boundary
+ * 를 찾고 Range.extractContents 로 후반부를 분리. 후반부를 담은 동일 tag 의 신규
+ * element 를 반환 — id 는 제거, 그 외 attribute 는 복제.
+ *
+ * @returns 후반부 element. split 불가능하면 null (원본 변경 없음).
+ */
+export function splitElementAtCharIndex(
+  el: HTMLElement,
+  charIndex: number
+): HTMLElement | null {
+  if (charIndex <= 0) return null
+  const totalLength = (el.textContent ?? '').length
+  if (charIndex >= totalLength) return null
+  if (!el.lastChild) return null
+
+  const boundary = locateCharBoundary(el, charIndex)
+  if (!boundary) return null
+
+  const range = el.ownerDocument.createRange()
+  range.setStart(boundary.node, boundary.offset)
+  range.setEndAfter(el.lastChild)
+  const fragment = range.extractContents()
+
+  const tail = el.ownerDocument.createElement(el.tagName) as HTMLElement
+  for (const attr of Array.from(el.attributes)) {
+    if (attr.name === 'id') continue
+    tail.setAttribute(attr.name, attr.value)
+  }
+  tail.appendChild(fragment)
+  return tail
+}
