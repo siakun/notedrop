@@ -58,3 +58,11 @@ export const MAX_SPLIT_RECURSION = 50
 
 /** 단락이 height 게이트를 통과하는 여유 (overflow:hidden 의 마진). */
 export const SPLIT_HEIGHT_TOLERANCE_PX = 1
+
+/**
+ * tag 가 splittable 한지 — `<p>`, `<li>` 만 true. heading / table / pre / code /
+ * img / list-container / blockquote / div 등은 false (의미 단위 보존).
+ */
+export function isSplittableElement(el: HTMLElement): boolean {
+  return SPLITTABLE_TAGS.has(el.tagName.toLowerCase())
+}
