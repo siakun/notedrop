@@ -152,13 +152,23 @@ npm run dev         # next dev (http://localhost:3000)
 
 ### Release
 
+`manifest.json` 의 `version` 만 bump 후 commit + push 하면 release.yml 가 자동으로:
+
+1. `manifest.json` paths 변경 trigger
+2. 해당 version 의 tag 가 이미 존재하는지 확인 (있으면 skip)
+3. viewer 빌드 → plugin typecheck/test/build (NODE_ENV=production)
+4. annotated tag (`<version>`) 자동 작성 + push
+5. GitHub release 생성 + `main.js` / `manifest.json` / `styles.css` attach
+
 ```bash
-# manifest.json version 과 tag 일치 (release.yml 검증)
-git tag 0.1.9
-git push origin main 0.1.9
+# 4 곳 version sync (manifest.json + plugin/package.json + viewer/package.json + plugin/src/main.ts.PLUGIN_VERSION)
+# 그 후 보통의 commit + push 진행
+git push origin main
 ```
 
-`release.yml` 가 viewer 빌드 → plugin typecheck/test/build → release + `main.js`/`manifest.json`/`styles.css` attach.
+GitHub Desktop 사용자도 동일 — manifest.json bump + commit + Push 만. 별도 tag 작성 없음. 단 manifest.json 의 `version` 만 변경된 commit 이 trigger 라 *4 곳 version sync* 의무는 그대로 (사용자 책임).
+
+manual tag 이용한 옛 워크플로 (`git tag <ver> && git push origin <ver>`) 는 폐기. 단 `workflow_dispatch` 존재어 GitHub Actions UI 에서 manual trigger 가능.
 
 ## 마일스톤 (2026-04-26 v0.1.x 시점)
 
