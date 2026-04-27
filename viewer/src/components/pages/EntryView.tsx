@@ -1,11 +1,18 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, type CSSProperties } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties
+} from 'react'
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer'
 import PaginatedView from '@/components/pagination/PaginatedView'
 import { useContent } from '@/hooks/useContent'
 import { useCustomCss } from '@/hooks/useCustomCss'
-import { computeLayout, computePageFit } from '@/lib/paginate'
+import { applyFitDims, computeLayout, computePageFit } from '@/lib/paginate'
 import { useSetLayoutResult, useViewSettings } from '@/stores/viewerStore'
 import type { ManifestItem } from '@/types/manifest'
 import type { Manifest } from '@/types/manifest'
@@ -27,6 +34,8 @@ const MEASURE_CONTAINER_STYLE: CSSProperties = {
   visibility: 'hidden',
   pointerEvents: 'none'
 }
+
+const RESIZE_DEBOUNCE_MS = 200
 
 /**
  * Entry 본문 렌더 + 페이지네이션 + customCss + book 모드 chapter 네비.
@@ -51,8 +60,25 @@ export default function EntryView({
   const { content, error } = useContent(targetHash)
   const settings = useViewSettings()
   const setLayoutResult = useSetLayoutResult()
+  const measurePaperRef = useRef<HTMLElement | null>(null)
+  const [viewportTick, setViewportTick] = useState(0)
 
   const isPaginate = settings.layout !== 'default'
+
+  // window resize → debounced viewport tick. measurePaperStyle 재계산 + 재 측정 트리거.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isPaginate) return
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const onResize = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => setViewportTick((t) => t + 1), RESIZE_DEBOUNCE_MS)
+    }
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      if (timer) clearTimeout(timer)
+    }
+  }, [isPaginate])
 
   // settings 변경 시 MarkdownRenderer key 갱신 → unmount + remount → 새 onContentReady.
   const renderKey = useMemo(
@@ -92,7 +118,9 @@ export default function EntryView({
       height: `${fit.height}px`,
       padding: `${fit.padTop}px ${fit.padRight}px ${fit.padBottom}px ${fit.padLeft}px`
     }
-  }, [isPaginate, settings])
+    // viewportTick 가 dep — resize 시 재계산.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPaginate, settings, viewportTick])
 
   useCustomCss(targetHash, content?.frontmatter.customCss ?? null)
 
@@ -105,6 +133,22 @@ export default function EntryView({
     },
     [isPaginate, settings, setLayoutResult]
   )
+
+  // viewportTick 변경 시 (resize) 재 측정. measurePaperRef 가 paper-page,
+  // 자식 .entry-content 의 children 측정.
+  useEffect(() => {
+    if (!isPaginate || viewportTick === 0) return
+    const measureEl = measurePaperRef.current
+    if (!measureEl) return
+    // measure paper-page 도 새 fit 반영 (inline style 갱신은 measurePaperStyle
+    // useMemo 가 처리 — 이 effect 후 React re-render 가 적용)
+    const newFit = computePageFit(settings, settings.layout)
+    if (newFit) applyFitDims(measureEl, newFit)
+    const root = measureEl.querySelector('.entry-content') as HTMLElement | null
+    if (!root) return
+    const result = computeLayout(root, settings, settings.layout)
+    setLayoutResult(result.pages, result.fit)
+  }, [viewportTick, isPaginate, settings, setLayoutResult])
 
   // layout='default' 진입 시 store 의 pages 비움 (PaginatedView 미사용).
   useEffect(() => {
@@ -125,7 +169,11 @@ export default function EntryView({
 
   const measureMarkdown = isPaginate ? (
     <div aria-hidden="true" style={MEASURE_CONTAINER_STYLE}>
-      <section className="paper-page" style={measurePaperStyle}>
+      <section
+        ref={measurePaperRef}
+        className="paper-page"
+        style={measurePaperStyle}
+      >
         <MarkdownRenderer
           key={renderKey}
           body={content.body}
