@@ -66,3 +66,27 @@ export const SPLIT_HEIGHT_TOLERANCE_PX = 1
 export function isSplittableElement(el: HTMLElement): boolean {
   return SPLITTABLE_TAGS.has(el.tagName.toLowerCase())
 }
+
+/**
+ * pretext measure 결과 + 페이지 inner height 로 split 지점의 char index 산출.
+ *
+ * @returns char index — 이 위치를 boundary 로 잡고 element 를 split.
+ *   null → 분할 불필요 (전체가 들어가거나 입력 비정상).
+ */
+export function pickSplitLine(
+  result: MeasureResult,
+  innerHeightPx: number
+): number | null {
+  const { lineHeight, lines } = result
+  if (lines.length === 0) return null
+  if (lineHeight <= 0) return null
+
+  const totalHeight = lineHeight * lines.length
+  if (totalHeight <= innerHeightPx + SPLIT_HEIGHT_TOLERANCE_PX) return null
+
+  const fitCount = Math.floor(innerHeightPx / lineHeight)
+  // 한 줄도 안 들어가는 극한 케이스에도 최소 1줄 강제 — 무한 재귀 회피.
+  const safeCount = Math.max(1, fitCount)
+  const idx = Math.min(safeCount, lines.length) - 1
+  return lines[idx]!.endIdx
+}
