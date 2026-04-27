@@ -59,7 +59,7 @@ export function computePageFit(
   let pageWidth: number
   let pageHeight: number
 
-  if (settings.pageSize === 'auto') {
+  if (settings.pageSize === 'Auto') {
     // viewport-fit (기존 horizontal/two-pages 동작)
     pageHeight = viewportH - 32
     pageWidth = pageHeight * ratio
@@ -167,7 +167,7 @@ export function paginateVertical(
   let innerWidthPx: number
   let fit: PageFit | null = null
 
-  if (settings.pageSize === 'auto') {
+  if (settings.pageSize === 'Auto') {
     fit = computePageFit(settings, 'vertical')
     if (!fit) return
     innerHeightPx = fit.innerHeight

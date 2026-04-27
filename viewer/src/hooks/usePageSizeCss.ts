@@ -20,7 +20,7 @@ export function usePageSizeCss(): void {
     const root = document.documentElement.style
     // 'auto' 면 mm 단위 CSS variable 무관 — paginate 가 inline style 로 fit 결과
     // 적용. 기존 variable 도 유지 (다른 layout 에서 참조하면 문제 없게 last 값 그대로).
-    if (settings.pageSize !== 'auto') {
+    if (settings.pageSize !== 'Auto') {
       const dims = PAGE_DIMS[settings.pageSize]
       root.setProperty('--page-width-mm', `${dims.w}mm`)
       root.setProperty('--page-height-mm', `${dims.h}mm`)

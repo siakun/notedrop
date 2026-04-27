@@ -11,8 +11,10 @@ export function loadViewSettings(): ViewSettings {
   try {
     const raw = window.localStorage.getItem(VS_STORAGE_KEY)
     if (!raw) return { ...VS_DEFAULTS }
-    const parsed = JSON.parse(raw) as Partial<ViewSettings>
-    return { ...VS_DEFAULTS, ...parsed }
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    // v0.1.53 옛 'auto' → v0.1.54+ 'Auto' 마이그레이션 (PageSize 컨벤션 통일)
+    if (parsed.pageSize === 'auto') parsed.pageSize = 'Auto'
+    return { ...VS_DEFAULTS, ...(parsed as Partial<ViewSettings>) }
   } catch {
     return { ...VS_DEFAULTS }
   }
