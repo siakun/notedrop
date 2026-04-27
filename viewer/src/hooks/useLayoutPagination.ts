@@ -11,40 +11,33 @@ import { logger } from '@/lib/logger'
 import type { ViewSettings } from '@/types/viewSettings'
 import type { PageIndicatorState } from '@/components/layout/PageIndicator'
 
+const RESIZE_DEBOUNCE_MS = 200
+
 /**
- * Markdown 렌더 완료 후 layout 모드 별 페이지네이션 + PageIndicator 상태
- * 갱신. EntryView 의 핵심 로직 hook 추출 — 컴포넌트는 단순 "ref + 콜백
- * 받음" 만.
+ * Markdown 렌더 완료 후 layout 모드별 페이지네이션 + PageIndicator 상태 갱신.
+ * line-단위 paginate 알고리즘 (lib/lineStream.ts) 사용.
  *
  * Layout 별 동작:
- *  - default: 페이지네이션 X (일반 flow). indicator 숨김.
+ *  - default: 페이지네이션 X. indicator 숨김.
  *  - vertical: paginateVertical (paper-page 분리). indicator 숨김.
- *  - horizontal/two-pages: paginateStrip + StripController (가상 가로
- *    스크롤 + 휠/키 이벤트 hijack). indicator 표시.
+ *  - horizontal/two-pages: paginateStrip + StripController (가상 가로 스크롤).
+ *    indicator 표시.
  *
- * StripController 인스턴스는 ref 보관, layout 변경 또는 unmount 시 자동
- * destroy (wheel/keydown listener 정리).
+ * window resize listener (debounce 200ms): viewport 변경 시 markdown 재처리 X,
+ * paginate 만 다시 호출 (lastRootRef 사용). settings 변경 흐름과 동일 진입점
+ * (runPaginate) — 일관된 cleanup + paginate 재실행.
+ *
+ * StripController 인스턴스는 ref 보관, layout 변경/unmount 시 자동 destroy.
  */
 export function useLayoutPagination(
   settings: ViewSettings,
   onIndicator: (state: PageIndicatorState) => void
 ): { handleContentReady: (root: HTMLElement) => void } {
   const stripControllerRef = useRef<StripController | null>(null)
+  const lastRootRef = useRef<HTMLElement | null>(null)
 
-  // unmount 시 cleanup. layout 변경 시 handleContentReady 가 직접 destroy.
-  useEffect(() => {
-    return () => {
-      if (stripControllerRef.current) {
-        stripControllerRef.current.destroy()
-        stripControllerRef.current = null
-      }
-    }
-  }, [])
-
-  const handleContentReady = useCallback(
+  const runPaginate = useCallback(
     (root: HTMLElement) => {
-      // 옛 controller 가 있으면 entry-content null check 보다 *먼저* destroy —
-      // home 으로 navigate 시 listener 잔존 방지 (§13.6.3).
       if (stripControllerRef.current) {
         stripControllerRef.current.destroy()
         stripControllerRef.current = null
@@ -81,11 +74,45 @@ export function useLayoutPagination(
         return
       }
 
-      // default layout — 페이지네이션 X
       onIndicator({ visible: false, current: 0, total: 0, layout: settings.layout })
     },
-    // settings 의 어떤 값이든 변경 시 새 콜백 — paginate 다시
     [settings, onIndicator]
+  )
+
+  // window resize → debounced re-paginate. markdown 재처리 X.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const onResize = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        const root = lastRootRef.current
+        if (root) runPaginate(root)
+      }, RESIZE_DEBOUNCE_MS)
+    }
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      if (timer) clearTimeout(timer)
+    }
+  }, [runPaginate])
+
+  // unmount cleanup
+  useEffect(() => {
+    return () => {
+      if (stripControllerRef.current) {
+        stripControllerRef.current.destroy()
+        stripControllerRef.current = null
+      }
+    }
+  }, [])
+
+  const handleContentReady = useCallback(
+    (root: HTMLElement) => {
+      lastRootRef.current = root
+      runPaginate(root)
+    },
+    [runPaginate]
   )
 
   return { handleContentReady }
