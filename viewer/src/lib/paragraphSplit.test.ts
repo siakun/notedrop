@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  expandLargeParagraphs,
   isSplittableElement,
   mapLineTextsToRanges,
   pickSplitLine,
@@ -242,5 +243,58 @@ describe('splitParagraph', () => {
     })
     const result = splitParagraph(p, { innerWidthPx: 500, innerHeightPx: 50 }, stuck)
     expect(result.length).toBeLessThanOrEqual(1000)
+  })
+})
+
+describe('expandLargeParagraphs', () => {
+  it('parent DOM 에서 단락 swap — 결과 배열 순서 = DOM 순서', () => {
+    const parent = document.createElement('section')
+    const p1 = document.createElement('p')
+    p1.textContent = 'ABCDEFGHIJ'  // 10 chars
+    const p2 = document.createElement('p')
+    p2.textContent = 'short'
+    parent.appendChild(p1)
+    parent.appendChild(p2)
+
+    const m = fakeMeasurer(2, 20)
+    // p1: 5 lines × 20 = 100. innerHeight=40 → 2 lines/페이지. 3 단락 (4/4/2).
+    // p2: 5 chars / 2 per line = 3 lines × 20 = 60. innerHeight=40 → 분할.
+    //   원본 5 chars → 4/1 (2 단락).
+    const result = expandLargeParagraphs(
+      parent,
+      [p1, p2],
+      { innerWidthPx: 500, innerHeightPx: 40 },
+      m
+    )
+
+    expect(result.length).toBe(5)  // p1 → 3, p2 → 2
+    expect(parent.children.length).toBe(5)
+    expect(parent.children[0]!.textContent).toBe('ABCD')
+    expect(parent.children[1]!.textContent).toBe('EFGH')
+    expect(parent.children[2]!.textContent).toBe('IJ')
+    expect(parent.children[3]!.textContent).toBe('shor')
+    expect(parent.children[4]!.textContent).toBe('t')
+  })
+
+  it('splittable 아닌 element 는 그대로 통과', () => {
+    const parent = document.createElement('section')
+    const div = document.createElement('div')
+    div.textContent = 'unchangeable'
+    parent.appendChild(div)
+    const m = fakeMeasurer(2, 20)
+    const result = expandLargeParagraphs(
+      parent,
+      [div],
+      { innerWidthPx: 500, innerHeightPx: 10 },
+      m
+    )
+    expect(result).toEqual([div])
+    expect(parent.children[0]).toBe(div)
+  })
+
+  it('빈 children 배열 → 빈 결과', () => {
+    const parent = document.createElement('section')
+    const m = fakeMeasurer(2, 20)
+    expect(expandLargeParagraphs(parent, [], noopMetrics, m)).toEqual([])
   })
 })

@@ -290,3 +290,38 @@ export function createPretextMeasurer(): LineRangeMeasurer {
     return { lineHeight: style.lineHeight, lines }
   }
 }
+
+/**
+ * 다수 children 에 대해 splitParagraph 적용. 분할된 경우 parent DOM 에 in-place
+ * swap (원본 위치에 분할 결과를 순서대로 삽입, 원본 제거).
+ *
+ * 호출 시점에 children 은 이미 measure 컨테이너 안에 있어야 한다 — splitParagraph
+ * 의 readFontStyle 가 computed style 을 의미 있는 값으로 반환하기 위함.
+ *
+ * @returns 평탄화된 element 배열 (DOM 순서와 동일).
+ */
+export function expandLargeParagraphs(
+  parent: HTMLElement,
+  children: HTMLElement[],
+  metrics: SplitMetrics,
+  measurer: LineRangeMeasurer
+): HTMLElement[] {
+  const output: HTMLElement[] = []
+  for (const child of children) {
+    const parts = splitParagraph(child, metrics, measurer)
+    if (parts.length === 1 && parts[0] === child) {
+      output.push(child)
+      continue
+    }
+    // splitParagraph 는 [child, tail1, tail2, ...] 반환 — child 는 in-place 변형
+    // 된 head. 따라서 child 는 그대로 두고 후속 parts 만 child 다음에 삽입.
+    let prev: Node = child
+    for (let i = 1; i < parts.length; i++) {
+      const part = parts[i]!
+      parent.insertBefore(part, prev.nextSibling)
+      prev = part
+    }
+    output.push(...parts)
+  }
+  return output
+}
