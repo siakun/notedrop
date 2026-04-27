@@ -5,7 +5,7 @@ description: Use when developing notedrop plugin/viewer and need to verify behav
 
 # Notedrop Dogfood Automation
 
-vault 안 plugin 의 모든 read/write/명령/검증 step 을 obsidian-cli + gh + curl 로 자동화. 사용자 수동 첨부·수동 publish·수동 BRAT 재설치 없음 으로 dogfood 사이클 닫음.
+vault 안 plugin 의 모든 read/write/명령/검증 step 을 obsidian-cli + gh + curl 로 자동화. 사용자 수동 첨부·수동 publish·수동 BRAT 재설치 없이 dogfood 사이클 종결.
 
 ## 전제
 
@@ -168,7 +168,7 @@ obsidian-cli 범위 밖. 의무 의무:
 | 브라우저 viewer 시각 검증 | `playwright-skill` 또는 `browser-use` 호출 |
 | Obsidian window screenshot path | obsidian-cli 의 path 처리 quirk — `dev:cdp method=Page.captureScreenshot` 으로 base64 받기 시도 가능 (미완 검증) |
 | mock vault 생성 (§6.3) | 사용자 수동 vault 생성 + Obsidian 으로 1회 open. 이후 자동 |
-| GH Pages enable (§7.1) | PAT 에 `administration:write` scope 스코프 부여 token 환경변수로 받음 |
+| GH Pages enable (§7.1) | `administration:write` scope 부여한 PAT 를 환경변수로 받음 |
 | eval 안 setTimeout-async | 외부 bash sleep 폴링으로 분리 |
 
 ## ⚠️ 보안 의무

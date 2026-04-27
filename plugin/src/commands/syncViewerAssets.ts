@@ -37,9 +37,9 @@ import type { CommandDef } from './types.js'
  * 일반 publish (publishVault) 는 옵션 B 후 viewer 자산 push X (baseline
  * 의 cached entry 만 등록 + 변경 감지 filter 가 변경 없음 분류). 즉 viewer
  * 자산 갱신은 *항상 본 명령어 명시 trigger* 의무. 사용자가 plugin update 후
- * 한 번도 미실행하면 share repo 의 viewer UI 가 옛 chunk hash 그대로 (즉
- * fetch 가 *옛 path* 사용 — UI 깨지지 않음, 단 새 plugin 의 변경 사항
- * 미반영).
+ * 한 번도 실행하지 않으면 share repo 의 viewer UI 가 옛 chunk hash 그대로
+ * (즉 fetch 가 *옛 path* 사용 — UI 깨지지 않음, 단 새 plugin 의 변경
+ * 사항 미반영).
  */
 export type SyncViewerDeps = {
   app: App
