@@ -170,7 +170,7 @@ GitHub Desktop 사용자도 동일 — manifest.json bump + commit + Push 만. �
 
 manual tag 이용한 옛 워크플로 (`git tag <ver> && git push origin <ver>`) 는 폐기. 단 `workflow_dispatch` 존재하므로 GitHub Actions UI 에서 manual trigger 가능.
 
-## 마일스톤 (2026-04-26 v0.1.x 시점)
+## 마일스톤 (2026-04-28 v0.2.0 시점)
 
 - [x] **M1** Domain layer (의존 없음 도메인 6 + ports + fakes)
 - [x] **M2** Adapters + EventBridge + BRAT 알파 (`0.0.1`)

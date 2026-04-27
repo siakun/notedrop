@@ -37,11 +37,16 @@ gh run rerun <last-run-id>       # release.yml 재실행 → tag 새로 생성�
 - `releases/latest` REST: 정상 (최신 release 반환)
 - `releases/tags/<v>` REST: 정상
 - GraphQL `repository.releases`: 정상
-- **`releases` listing REST: `[]` empty** — BRAT 의 "Change plugin version" dropdown 이 이 endpoint 를 쓰니까 dropdown 이 옛 버전만 노출.
-- 우회: BRAT 에서 "Latest version" 옵션 (별도 endpoint) 사용 가능.
-- 자연 회복 시간 미상. 추가 release 누적이 index 재구축을 유도할 가능성.
+- **`releases` listing REST: `[]` empty** — BRAT 의 "Change plugin version" dropdown 이 이 endpoint 를 쓰니까 dropdown 이 옛 버전만 노출. PAT 등록해서 cache 우회해도 빈 응답.
+- 우회: BRAT 에서 "Latest version" 옵션 (별도 endpoint) 사용. 또는 `releases/latest/download/<asset>` 직접 다운로드.
 
-**그러므로**: 위 복구 절차는 **마지막 수단**. tag 동봉 push 자체를 안 하는 게 최선. 복구 후엔 BRAT 등 외부 도구의 listing endpoint 의존 결과를 확인해야 함.
+**시도된 회복 절차 (모두 GitHub 측 listing index 는 못 살림, ETag stuck `078404...`)**:
+1. `gh release edit --notes` 로 metadata 변경 → 효과 없음
+2. `gh release edit --draft` 후 undraft toggle → 효과 없음
+3. **clean slate**: 0.1.x release/tag 전부 삭제 (0.0.X + 0.1.X 67 tags + 5 releases) + `0.2.0` minor bump 재시작 → 새 release 정상 publish, `releases/latest` 도 0.2.0 반환, 그러나 listing endpoint 는 **여전히 `[]`**
+4. user 는 BRAT 의 "Latest version" 옵션으로 0.2.0 설치 성공 — listing endpoint 는 GitHub Support 티켓 외에는 자력 복구 불가로 보임
+
+**그러므로**: 위 "tag delete + rerun" 복구 절차는 **절대 피할 것**. tag 동봉 push 자체를 안 하는 게 최선. 일단 listing index 가 망가지면 재생성·minor bump 로도 안 살아남.
 
 ### 참고
 
@@ -51,6 +56,13 @@ gh run rerun <last-run-id>       # release.yml 재실행 → tag 새로 생성�
 
 ### 알려진 미해결 모순 (2026-04-28 기준)
 
-- `plugin/src/main.ts:31` 의 `const PLUGIN_VERSION = '0.1.49'` 는 현재 manifest 와 분리되어 stale.
+- `plugin/src/main.ts:31` 의 `const PLUGIN_VERSION = '0.1.49'` 는 현재 manifest (`0.2.0`) 와 분리돼 더 stale 해짐.
 - README 는 4 곳 sync (PLUGIN_VERSION 포함, lock 제외), 메모리 + 실제 practice 는 5 곳 sync (lock 포함, PLUGIN_VERSION 제외) 로 갈라짐.
 - 사용자 결정 후 (A) memory + practice 갱신 / (B) esbuild define 으로 build-time 주입해 source 상수 제거 / (C) 6 곳 sync 명시 중 하나로 통일 필요.
+
+### v0.1.x → v0.2.0 reset (2026-04-28)
+
+- 위 listing index 사고로 **v0.1.x 의 모든 release/tag 삭제 + v0.2.0 으로 minor bump 재시작**.
+- 백업 tag (`m1-domain-complete{,-en-backup}`) 만 유지.
+- 이전 v0.1.x history 는 main branch 의 commit 으로는 그대로 남음 (tag 만 사라짐).
+- 마일스톤 정의 (M1~M5) 자체는 유효, README 의 "v0.1.x 시점" 문구만 의미상 v0.2.x 로 이동.
