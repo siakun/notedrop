@@ -40,7 +40,14 @@ type PaginateSlice = {
   setIndicator: (state: IndicatorState) => void
 }
 
-type ViewerStore = SettingsSlice & PaginateSlice
+export type LiveStatus = 'idle' | 'connected' | 'updated' | 'reconnecting'
+
+type LiveSlice = {
+  liveStatus: LiveStatus
+  setLiveStatus: (s: LiveStatus) => void
+}
+
+type ViewerStore = SettingsSlice & PaginateSlice & LiveSlice
 
 const INITIAL_INDICATOR: IndicatorState = {
   visible: false,
@@ -92,9 +99,13 @@ export const useViewerStore = create<ViewerStore>()(
         set({ settings: VS_DEFAULTS })
       },
 
-      // Paginate slice — indicator 만 1차 단계. lineGroups / pages 는 후속 (v0.1.58).
+      // Paginate slice — indicator 만 1차 단계. lineGroups / pages 는 후속.
       indicator: INITIAL_INDICATOR,
-      setIndicator: (state) => set({ indicator: state })
+      setIndicator: (state) => set({ indicator: state }),
+
+      // Live reload slice — preview server SSE 연결 상태.
+      liveStatus: 'idle',
+      setLiveStatus: (s) => set({ liveStatus: s })
     }),
     {
       name: VS_STORAGE_KEY,
@@ -146,4 +157,14 @@ export function useIndicator(): IndicatorState {
 /** Hook — setIndicator 함수만. */
 export function useSetIndicator(): (state: IndicatorState) => void {
   return useViewerStore((s) => s.setIndicator)
+}
+
+/** Hook — live reload 상태. */
+export function useLiveStatus(): LiveStatus {
+  return useViewerStore((s) => s.liveStatus)
+}
+
+/** Hook — setLiveStatus 함수만. */
+export function useSetLiveStatus(): (s: LiveStatus) => void {
+  return useViewerStore((s) => s.setLiveStatus)
 }

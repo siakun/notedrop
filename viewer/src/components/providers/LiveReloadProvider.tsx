@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { invalidateAllContent, invalidateContent } from '@/lib/contentClient'
 import { invalidateManifest } from '@/lib/manifestClient'
-
-type ReloadStatus = 'idle' | 'connected' | 'updated' | 'reconnecting'
+import { useLiveStatus, useSetLiveStatus } from '@/stores/viewerStore'
 
 function isPreviewHost(): boolean {
   if (typeof window === 'undefined') return false
@@ -13,7 +12,8 @@ function isPreviewHost(): boolean {
 }
 
 export default function LiveBadge() {
-  const [status, setStatus] = useState<ReloadStatus>('idle')
+  const status = useLiveStatus()
+  const setStatus = useSetLiveStatus()
 
   useEffect(() => {
     if (!isPreviewHost()) return
@@ -93,7 +93,7 @@ export default function LiveBadge() {
       if (timer) clearTimeout(timer)
       if (es) es.close()
     }
-  }, [])
+  }, [setStatus])
 
   if (status === 'idle') return null
   return (
