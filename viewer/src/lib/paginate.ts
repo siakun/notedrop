@@ -1,6 +1,11 @@
 import type { LayoutMode, ViewSettings } from '@/types/viewSettings'
 import { PAGE_DIMS } from '@/types/viewSettings'
-import { createPretextMeasurer, expandLargeParagraphs } from './paragraphSplit'
+import {
+  buildLineStream,
+  renderLineGroups,
+  splitByLineHeight
+} from './lineStream'
+import { createPretextMeasurer } from './paragraphSplit'
 
 export function mmToPx(mm: number): number {
   return mm * (96 / 25.4)
@@ -12,22 +17,6 @@ export function clamp(n: number, lo: number, hi: number): number {
 
 export function round1(n: number): number {
   return Math.round(n * 10) / 10
-}
-
-export function splitByHeight(heights: number[], limit: number): number[][] {
-  const groups: number[][] = [[]]
-  let used = 0
-  for (let i = 0; i < heights.length; i++) {
-    const h = heights[i]!
-    const last = groups[groups.length - 1]!
-    if (used + h > limit && last.length > 0) {
-      groups.push([])
-      used = 0
-    }
-    groups[groups.length - 1]!.push(i)
-    used += h
-  }
-  return groups
 }
 
 export type PageFit = {
@@ -137,6 +126,13 @@ export function unpaginate(content: HTMLElement): void {
   }
 }
 
+/**
+ * Vertical scroll paginate. line 단위 알고리즘:
+ *   1. measure 컨테이너 (paper-page) 에 children 임시 배치 — font/offsetHeight 측정 가능
+ *   2. buildLineStream → element 들을 Line[] 으로 분해
+ *   3. splitByLineHeight → Line[] → page groups
+ *   4. renderLineGroups → 각 group 마다 paper-page 생성 + line 들을 source 별로 다시 묶음
+ */
 export function paginateVertical(
   content: HTMLElement,
   settings: ViewSettings
@@ -153,28 +149,19 @@ export function paginateVertical(
   const flat = Array.from(content.children) as HTMLElement[]
   if (flat.length === 0) return
 
-  const initialPage = createPaperPage()
-  for (const child of flat) initialPage.appendChild(child)
+  // measure 컨테이너 — paper-page 안에 children 임시 배치 → computed style + offsetHeight 측정
+  const measure = createPaperPage()
+  for (const child of flat) measure.appendChild(child)
   content.innerHTML = ''
-  content.appendChild(initialPage)
+  content.appendChild(measure)
 
-  // 긴 단락 사전 분할 — splitByHeight 는 element 단위만 자르므로 단일 단락이
-  // innerHeight 를 초과하는 케이스를 여기서 줄 단위로 미리 쪼갠다.
-  const expanded = expandLargeParagraphs(
-    initialPage,
+  const lineStream = buildLineStream(
     flat,
     { innerWidthPx, innerHeightPx },
     createPretextMeasurer()
   )
-  const heights = expanded.map((c) => c.offsetHeight)
-  const groups = splitByHeight(heights, innerHeightPx)
-
-  content.innerHTML = ''
-  for (const group of groups) {
-    const page = createPaperPage()
-    for (const idx of group) page.appendChild(expanded[idx]!)
-    content.appendChild(page)
-  }
+  const lineGroups = splitByLineHeight(lineStream, innerHeightPx)
+  renderLineGroups(content, lineGroups)
 }
 
 export type StripPagination = {
@@ -183,6 +170,11 @@ export type StripPagination = {
   strip: HTMLElement
 }
 
+/**
+ * Horizontal / two-pages strip paginate. line 단위 알고리즘은 vertical 과 동일,
+ * fit 의 viewport-scaled width/height 사용. renderLineGroups 결과 paper-page 들을
+ * .page-strip 으로 wrap + applyFitDims.
+ */
 export function paginateStrip(
   content: HTMLElement,
   settings: ViewSettings,
@@ -200,24 +192,24 @@ export function paginateStrip(
   content.appendChild(measure)
 
   const innerWidthPx = fit.width - fit.padLeft - fit.padRight
-  const expanded = expandLargeParagraphs(
-    measure,
+  const lineStream = buildLineStream(
     flat,
     { innerWidthPx, innerHeightPx: fit.innerHeight },
     createPretextMeasurer()
   )
-  const heights = expanded.map((c) => c.offsetHeight)
-  const groups = splitByHeight(heights, fit.innerHeight)
+  const lineGroups = splitByLineHeight(lineStream, fit.innerHeight)
+
+  // renderLineGroups 가 paper-page 들을 임시 컨테이너에 만든 후 strip 으로 wrap
+  const tmp = document.createElement('div')
+  renderLineGroups(tmp, lineGroups)
 
   content.innerHTML = ''
   const strip = document.createElement('div')
   strip.className = 'page-strip'
-  for (const group of groups) {
-    const page = createPaperPage()
-    applyFitDims(page, fit)
-    for (const idx of group) page.appendChild(expanded[idx]!)
+  for (const page of Array.from(tmp.children)) {
+    if (page instanceof HTMLElement) applyFitDims(page, fit)
     strip.appendChild(page)
   }
   content.appendChild(strip)
-  return { totalPages: groups.length, fit, strip }
+  return { totalPages: lineGroups.length, fit, strip }
 }

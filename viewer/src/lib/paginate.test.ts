@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clamp, mmToPx, paginateVertical, round1, splitByHeight } from './paginate'
+import { clamp, mmToPx, paginateVertical, round1 } from './paginate'
 import { VS_DEFAULTS } from '@/types/viewSettings'
 
 describe('mmToPx', () => {
@@ -28,41 +28,10 @@ describe('round1', () => {
   })
 })
 
-describe('splitByHeight', () => {
-  it('한계 안에 다 들어가면 1 group', () => {
-    const heights = [10, 20, 30]
-    const groups = splitByHeight(heights, 100)
-    expect(groups).toEqual([[0, 1, 2]])
-  })
-
-  it('한계 초과 시 새 group 시작', () => {
-    const heights = [40, 40, 40]
-    const groups = splitByHeight(heights, 100)
-    // 0+40=40, 40+40=80, 80+40=120 > 100 → 새 group
-    expect(groups).toEqual([[0, 1], [2]])
-  })
-
-  it('단일 element 가 한계 초과해도 그 group 에 등록 (보존)', () => {
-    const heights = [200, 50]
-    const groups = splitByHeight(heights, 100)
-    // first group 빈 채로 0 추가 (overflow). 50 은 다음 group.
-    expect(groups).toEqual([[0], [1]])
-  })
-
-  it('빈 array 면 빈 group 1개', () => {
-    expect(splitByHeight([], 100)).toEqual([[]])
-  })
-
-  it('정확히 한계와 같으면 같은 group', () => {
-    const heights = [50, 50]
-    const groups = splitByHeight(heights, 100)
-    expect(groups).toEqual([[0, 1]])
-  })
-})
-
 describe('paginateVertical (회귀)', () => {
-  // jsdom 에서 pretext canvas 부재 → measurer throw → splitParagraph fallback.
-  // 따라서 expandLargeParagraphs 가 통합돼도 짧은 단락은 기존과 동일 동작.
+  // jsdom 에서 pretext canvas 부재 → buildLineStream 의 measurer throw →
+  // element 단위 1 line fallback. 짧은 단락은 short-paragraph gate (offsetHeight
+  // ≤ lineHeight×1.5) 통과 → measure skip + 1 line.
 
   it('짧은 단락 1개 → 단일 paper-page 1개', () => {
     const content = document.createElement('div')
