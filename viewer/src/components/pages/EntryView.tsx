@@ -61,7 +61,9 @@ export default function EntryView({
   const settings = useViewSettings()
   const setLayoutResult = useSetLayoutResult()
   const measurePaperRef = useRef<HTMLElement | null>(null)
+  const markdownRootRef = useRef<HTMLElement | null>(null)
   const [viewportTick, setViewportTick] = useState(0)
+  const [markdownTick, setMarkdownTick] = useState(0)
 
   const isPaginate = settings.layout !== 'default'
 
@@ -80,26 +82,13 @@ export default function EntryView({
     }
   }, [isPaginate])
 
-  // settings 변경 시 MarkdownRenderer key 갱신 → unmount + remount → 새 onContentReady.
+  // renderKey: markdown 내용 자체 변경 (note 변경 / vault 의 노트 update) 시만
+  // MarkdownRenderer unmount+remount → markdown 재처리. settings 변경은 markdown
+  // DOM 재사용 + 별도 useEffect 가 측정만 다시 (재 paginate). markdown 무거운
+  // unified.js parse 회피.
   const renderKey = useMemo(
-    () =>
-      `${targetHash}:${renderToken}:${settings.layout}:${settings.pageSize}` +
-      `:${settings.marginTop}:${settings.marginBottom}` +
-      `:${settings.marginLeft}:${settings.marginRight}` +
-      `:${settings.fontScale}:${settings.lineScale}:${settings.font}`,
-    [
-      targetHash,
-      renderToken,
-      settings.layout,
-      settings.pageSize,
-      settings.marginTop,
-      settings.marginBottom,
-      settings.marginLeft,
-      settings.marginRight,
-      settings.fontScale,
-      settings.lineScale,
-      settings.font
-    ]
+    () => `${targetHash}:${renderToken}`,
+    [targetHash, renderToken]
   )
 
   // measure paper-page 의 inline size — visible PaperPage 와 동일해야 측정 정확.
@@ -124,31 +113,33 @@ export default function EntryView({
 
   useCustomCss(targetHash, content?.frontmatter.customCss ?? null)
 
-  // markdown 렌더 완료 시점 → measure → store dispatch.
-  const handleContentReady = useCallback(
-    (root: HTMLElement) => {
-      if (!isPaginate) return
-      const result = computeLayout(root, settings, settings.layout)
-      setLayoutResult(result.pages, result.fit)
-    },
-    [isPaginate, settings, setLayoutResult]
-  )
+  // markdown 렌더 완료 시점 → ref 저장 + tick toggle 로 측정 useEffect 트리거.
+  // 측정 자체는 settings/viewport 변경 useEffect 와 동일 흐름.
+  const handleContentReady = useCallback((root: HTMLElement) => {
+    markdownRootRef.current = root
+    setMarkdownTick((t) => t + 1)
+  }, [])
 
-  // viewportTick 변경 시 (resize) 재 측정. measurePaperRef 가 paper-page,
-  // 자식 .entry-content 의 children 측정.
+  // settings/viewport/markdown 변경 시 재 측정. markdown 자체 재처리는 X
+  // (renderKey 가 targetHash + renderToken 만 dep). 무거운 unified.js parse 회피.
   useEffect(() => {
-    if (!isPaginate || viewportTick === 0) return
-    const measureEl = measurePaperRef.current
-    if (!measureEl) return
-    // measure paper-page 도 새 fit 반영 (inline style 갱신은 measurePaperStyle
-    // useMemo 가 처리 — 이 effect 후 React re-render 가 적용)
-    const newFit = computePageFit(settings, settings.layout)
-    if (newFit) applyFitDims(measureEl, newFit)
-    const root = measureEl.querySelector('.entry-content') as HTMLElement | null
+    if (!isPaginate) return
+    const root = markdownRootRef.current
     if (!root) return
+    const measureEl = measurePaperRef.current
+    if (measureEl) {
+      const newFit = computePageFit(settings, settings.layout)
+      if (newFit) applyFitDims(measureEl, newFit)
+    }
     const result = computeLayout(root, settings, settings.layout)
     setLayoutResult(result.pages, result.fit)
-  }, [viewportTick, isPaginate, settings, setLayoutResult])
+  }, [
+    settings,
+    viewportTick,
+    markdownTick,
+    isPaginate,
+    setLayoutResult
+  ])
 
   // layout='default' 진입 시 store 의 pages 비움 (PaginatedView 미사용).
   useEffect(() => {
