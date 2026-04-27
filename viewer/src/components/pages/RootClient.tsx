@@ -8,6 +8,7 @@ import Header from '@/components/layout/Header'
 import Home from './Home'
 import EntryView from './EntryView'
 import LiveBadge from '@/components/providers/LiveReloadProvider'
+import BuildInfoBadge from '@/components/providers/BuildInfoBadge'
 import PageIndicator, { type PageIndicatorState } from '@/components/layout/PageIndicator'
 import {
   resolveRoute,
@@ -50,6 +51,7 @@ export default function RootClient() {
       </main>
       <PageIndicator state={indicator} />
       <LiveBadge />
+      <BuildInfoBadge />
     </>
   )
 }

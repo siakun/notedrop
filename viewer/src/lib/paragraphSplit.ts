@@ -21,6 +21,7 @@ import {
   walkLineRanges,
   type WordBreakMode
 } from '@chenglou/pretext'
+import { logger } from './logger'
 
 /** pretext 의 WhiteSpaceMode (analysis.d.ts) — layout entry 에서 re-export 안 됨 */
 type PretextWhiteSpace = 'normal' | 'pre-wrap'
@@ -291,12 +292,48 @@ export function createPretextMeasurer(): LineRangeMeasurer {
   }
 }
 
+/** 진단 카운터 — window.__notedropParagraphDiag 에 노출. */
+type ParagraphDiag = {
+  callCount: number
+  splittableSeen: number
+  measurerErrors: number
+  splitParagraphs: number
+  partsCreated: number
+  oversizedRemaining: number
+  lastError: string | null
+  innerWidthPx: number
+  innerHeightPx: number
+}
+
+declare global {
+  interface Window {
+    __notedropParagraphDiag?: ParagraphDiag
+  }
+}
+
+function emptyDiag(): ParagraphDiag {
+  return {
+    callCount: 0,
+    splittableSeen: 0,
+    measurerErrors: 0,
+    splitParagraphs: 0,
+    partsCreated: 0,
+    oversizedRemaining: 0,
+    lastError: null,
+    innerWidthPx: 0,
+    innerHeightPx: 0
+  }
+}
+
 /**
  * 다수 children 에 대해 splitParagraph 적용. 분할된 경우 parent DOM 에 in-place
  * swap (원본 위치에 분할 결과를 순서대로 삽입, 원본 제거).
  *
  * 호출 시점에 children 은 이미 measure 컨테이너 안에 있어야 한다 — splitParagraph
  * 의 readFontStyle 가 computed style 을 의미 있는 값으로 반환하기 위함.
+ *
+ * 진단: window.__notedropParagraphDiag 에 호출 횟수 / 분할 / measurer 에러
+ * / oversized remaining 누적. dev console 에서 검증 가능.
  *
  * @returns 평탄화된 element 배열 (DOM 순서와 동일).
  */
@@ -306,13 +343,35 @@ export function expandLargeParagraphs(
   metrics: SplitMetrics,
   measurer: LineRangeMeasurer
 ): HTMLElement[] {
+  const diag: ParagraphDiag =
+    typeof window !== 'undefined' && window.__notedropParagraphDiag
+      ? window.__notedropParagraphDiag
+      : emptyDiag()
+  diag.callCount++
+  diag.innerWidthPx = metrics.innerWidthPx
+  diag.innerHeightPx = metrics.innerHeightPx
+
+  const wrappedMeasurer: LineRangeMeasurer = (text, style, widthPx) => {
+    try {
+      return measurer(text, style, widthPx)
+    } catch (err) {
+      diag.measurerErrors++
+      diag.lastError = err instanceof Error ? err.message : String(err)
+      throw err
+    }
+  }
+
   const output: HTMLElement[] = []
   for (const child of children) {
-    const parts = splitParagraph(child, metrics, measurer)
+    if (isSplittableElement(child)) diag.splittableSeen++
+    const parts = splitParagraph(child, metrics, wrappedMeasurer)
     if (parts.length === 1 && parts[0] === child) {
       output.push(child)
       continue
     }
+    diag.splitParagraphs++
+    diag.partsCreated += parts.length - 1
+
     // splitParagraph 는 [child, tail1, tail2, ...] 반환 — child 는 in-place 변형
     // 된 head. 따라서 child 는 그대로 두고 후속 parts 만 child 다음에 삽입.
     let prev: Node = child
@@ -323,5 +382,32 @@ export function expandLargeParagraphs(
     }
     output.push(...parts)
   }
+
+  // oversized 검사 — 분할 후에도 inner height 초과인 element 카운트
+  const limit = metrics.innerHeightPx + SPLIT_HEIGHT_TOLERANCE_PX
+  diag.oversizedRemaining = output.filter((el) => el.offsetHeight > limit).length
+
+  if (typeof window !== 'undefined') {
+    window.__notedropParagraphDiag = diag
+  }
+
+  if (diag.measurerErrors > 0 || diag.oversizedRemaining > 0) {
+    logger.warn('paginate', '단락 분할 비정상', {
+      measurerErrors: diag.measurerErrors,
+      oversizedRemaining: diag.oversizedRemaining,
+      splittableSeen: diag.splittableSeen,
+      splitParagraphs: diag.splitParagraphs,
+      lastError: diag.lastError
+    })
+  } else {
+    logger.debug('paginate', '단락 분할 정상', {
+      childCount: children.length,
+      outputCount: output.length,
+      splittableSeen: diag.splittableSeen,
+      splitParagraphs: diag.splitParagraphs,
+      partsCreated: diag.partsCreated
+    })
+  }
+
   return output
 }

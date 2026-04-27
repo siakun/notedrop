@@ -937,3 +937,23 @@ mark {
 .live-badge-connected { background: #16a34a; }
 .live-badge-updated { background: #0ea5e9; text-transform: lowercase; }
 .live-badge-reconnecting { background: #a16207; text-transform: lowercase; }
+
+/* Build info badge (좌하단, local preview 전용) */
+.build-info-badge {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  font: 500 11px/1 var(--font-mono);
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.75);
+  z-index: 1000;
+  letter-spacing: 0.04em;
+  user-select: text;
+  pointer-events: none;
+}
+
+.build-info-sha {
+  color: rgba(255, 255, 255, 0.55);
+}

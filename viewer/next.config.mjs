@@ -1,5 +1,25 @@
+import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
 /** @type {import('next').NextConfig} */
 const isProd = process.env.NODE_ENV === 'production'
+
+const pkg = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8'))
+const buildVersion = pkg.version
+
+let buildSha = process.env.GITHUB_SHA || ''
+if (!buildSha) {
+  try {
+    buildSha = execSync('git rev-parse HEAD', { cwd: __dirname }).toString().trim()
+  } catch {
+    buildSha = 'unknown'
+  }
+}
+const buildShaShort = buildSha.slice(0, 7) || 'unknown'
 
 // prod 빌드 시 basePath = placeholder. plugin 의 publishVault 가 publish
 // 시점에 사용자 share repo 이름 (settings.targetRepo 의 두번째 부분) 으로
@@ -29,6 +49,15 @@ const config = {
   generateBuildId: async () => 'notedrop-viewer',
   experimental: {
     optimizePackageImports: ['katex', 'mermaid']
+  },
+  // Build-time identity — viewer 가 자기 자신의 version + git sha 를 알아야
+  // local preview 에서 어떤 build 인지 확인 가능 (BuildInfoBadge 표시용).
+  // SHA 는 commit 단위라 deterministic — same commit → same fingerprint.
+  // 빌드 시점의 wall clock (Date.now 등) 은 절대 inject 금지 (v0.1.46 의
+  // deterministic build 깨짐).
+  env: {
+    NEXT_PUBLIC_BUILD_VERSION: buildVersion,
+    NEXT_PUBLIC_BUILD_SHA: buildShaShort
   }
 }
 
