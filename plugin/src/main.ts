@@ -28,7 +28,7 @@ import {
 import { Notice } from 'obsidian'
 import type { PluginContext } from './services/PluginContext.js'
 
-const PLUGIN_VERSION = '0.1.48'
+const PLUGIN_VERSION = '0.1.49'
 
 /**
  * Plugin entry. Hexagonal 정신상 main.ts 는:

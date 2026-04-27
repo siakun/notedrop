@@ -91,9 +91,19 @@ async function embedViewerAssets() {
     return
   }
 
+  // v0.1.49 deterministic fix: 명시적 sort + zipSync 의 mtime 고정.
+  // collectFiles 가 fs.readdir 로 OS 별 다른 순서 (Linux=inode,
+  // Windows=alphabetical) 등록 → zipSync 가 입력 순서 그대로 → 다른
+  // bytes. 또 fflate 의 zipSync 가 default 로 *현재 mtime* 사용 — 매 빌드
+  // 마다 다른 timestamp 존재. 두 문제 모두 fix 완료 실제 cross-platform
+  // deterministic.
+  // fflate 의 mtime 은 DOS time (1980 base) 사용 — 0 은 invalid.
+  // 1980-01-01T00:00:00Z 가 epoch 의 첫 valid 값.
+  const FIXED_MTIME = new Date('1980-01-01T00:00:00Z')
+  const sortedPaths = [...files.keys()].sort()
   const entries = {}
-  for (const [relPath, bytes] of files) {
-    entries[relPath] = bytes
+  for (const relPath of sortedPaths) {
+    entries[relPath] = [files.get(relPath), { mtime: FIXED_MTIME }]
   }
   const zipped = zipSync(entries, { level: 6 })
   const b64 = Buffer.from(zipped).toString('base64')
@@ -109,7 +119,9 @@ async function embedViewerAssets() {
 }
 
 async function collectFiles(root, current, acc = new Map()) {
-  const entries = await fs.readdir(current, { withFileTypes: true })
+  const rawEntries = await fs.readdir(current, { withFileTypes: true })
+  // v0.1.49: alphabetic sort — fs.readdir 가 OS 별 순서 보장 안 함
+  const entries = rawEntries.sort((a, b) => a.name.localeCompare(b.name))
   for (const entry of entries) {
     const full = path.join(current, entry.name)
     if (entry.isDirectory()) {
