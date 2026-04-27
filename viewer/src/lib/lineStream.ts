@@ -101,4 +101,56 @@ function readFontStyle(el: HTMLElement): FontStyle {
 export { splitElementAtCharIndex }
 export type { FontStyle, LineRangeMeasurer }
 
+/**
+ * Line[] → page groups. heading orphan 방지 규칙 포함.
+ *
+ * heading orphan: heading line 이 group 의 *마지막* 위치이고 다음 line 이
+ * 같은 group 에 못 들어가면 → heading 도 다음 group 으로 이동 (의미 단위
+ * 보존). 단 heading 이 *전체 line 의 마지막* 이거나 group 의 유일 line 이면
+ * 그대로 (빈 group 만들기 더 나쁨).
+ */
+export function splitByLineHeight(
+  lines: Line[],
+  innerHeightPx: number
+): Line[][] {
+  const groups: Line[][] = [[]]
+  let used = 0
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!
+    let last = groups[groups.length - 1]!
+
+    if (used + line.height > innerHeightPx && last.length > 0) {
+      groups.push([])
+      used = 0
+      last = groups[groups.length - 1]!
+    }
+    last.push(line)
+    used += line.height
+
+    // heading orphan 방지: line 이 push 된 직후 검사
+    if (
+      line.breakAfterAvoid &&
+      i < lines.length - 1 && // 전체 마지막 line 이 아님
+      last.length > 1 // heading 이 group 의 유일 line 이면 옮길 데 없음 — skip
+    ) {
+      const next = lines[i + 1]!
+      // 두 조건 모두 충족할 때만 orphan 방지 작동:
+      //   (1) 현재 group 에 next 가 더 못 들어감 (heading 이 mid-group orphan)
+      //   (2) heading + next 가 새 group 에 들어갈 수 있음 (이동해도 limit 안)
+      // 둘 중 하나라도 안 맞으면 그대로 — limit 초과 강제 묶음 회피.
+      if (
+        used + next.height > innerHeightPx &&
+        line.height + next.height <= innerHeightPx
+      ) {
+        last.pop()
+        groups.push([line])
+        used = line.height
+      }
+    }
+  }
+
+  return groups
+}
+
 // readFontStyle 은 internal — 단위 테스트 용 _readFontStyle export 안 함 (computed style 의존, mock 가능)
