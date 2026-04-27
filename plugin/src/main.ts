@@ -20,9 +20,15 @@ import { SeedPersistence } from './services/SeedPersistence.js'
 import { createPlanFactory } from './services/PlanFactory.js'
 import { FileLogger } from './services/Logger.js'
 import { EventLogger } from './services/EventLogger.js'
+import {
+  checkViewerFingerprintMismatch,
+  VIEWER_SYNC_NOTICE_MESSAGE,
+  VIEWER_SYNC_NOTICE_TIMEOUT_MS
+} from './services/ViewerSyncCheck.js'
+import { Notice } from 'obsidian'
 import type { PluginContext } from './services/PluginContext.js'
 
-const PLUGIN_VERSION = '0.1.47'
+const PLUGIN_VERSION = '0.1.48'
 
 /**
  * Plugin entry. Hexagonal 정신상 main.ts 는:
@@ -190,6 +196,24 @@ export default class NotedropPlugin extends Plugin {
         `notedrop: indexed ${index.list().length} published note(s)`
       )
       await this.seedPersistence.hydrateAfterBuild()
+
+      // v0.1.48: viewer fingerprint mismatch 감지 → 1회 Notice. plugin
+      // update 후 사용자가 노트 변경 없는 상태로 publish 진행 케이스 (옵션
+      // B 의 누락) 대안 — 사용자가 sync 의무 명시 인지.
+      const syncCheck = checkViewerFingerprintMismatch(this.settings)
+      if (syncCheck.needsSync) {
+        new Notice(VIEWER_SYNC_NOTICE_MESSAGE, VIEWER_SYNC_NOTICE_TIMEOUT_MS)
+        logger.info('lifecycle', 'viewer fingerprint mismatch on load', {
+          currentFingerprint: syncCheck.currentFingerprint,
+          baselineFingerprint: syncCheck.baselineFingerprint
+        })
+        void eventLogger.emit('viewer_fingerprint_mismatch', {
+          source: 'lifecycle_onload',
+          currentFingerprint: syncCheck.currentFingerprint,
+          baselineFingerprint: syncCheck.baselineFingerprint
+        })
+      }
+
       if (this.settings.autoStartPreview) {
         try {
           const status = await preview.start()

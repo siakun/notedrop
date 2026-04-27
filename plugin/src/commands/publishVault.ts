@@ -13,6 +13,11 @@ import type { PlanFactory } from '../services/PlanFactory.js'
 import { isViewerAssetPath } from '../services/PlanFactory.js'
 import type { DirtyTracker } from '../services/DirtyTracker.js'
 import type { Logger } from '../services/Logger.js'
+import {
+  checkViewerFingerprintMismatch,
+  VIEWER_SYNC_NOTICE_MESSAGE,
+  VIEWER_SYNC_NOTICE_TIMEOUT_MS
+} from '../services/ViewerSyncCheck.js'
 import type { CommandDef } from './types.js'
 
 export type PublishDeps = {
@@ -73,10 +78,26 @@ export async function publishVault(
 ): Promise<PublishResult> {
   const dirty = await gate.isDirty()
   if (!dirty) {
-    new Notice(
-      'notedrop: 변경 사항이 없습니다. 강제 발행은 Force publish 명령을 사용하세요.',
-      5000
-    )
+    // v0.1.48: dirty=false 라도 viewer fingerprint mismatch 시 sync 의무
+    // 안내. 옵션 B 의 누락 대안 — 사용자가 plugin update 후 노트 변경 0 인
+    // 상태로 publish 진행 케이스에서 sync 의무 영구 미인지 fix.
+    const syncCheck = checkViewerFingerprintMismatch(settings)
+    if (syncCheck.needsSync) {
+      new Notice(VIEWER_SYNC_NOTICE_MESSAGE, VIEWER_SYNC_NOTICE_TIMEOUT_MS)
+      deps.logger.info(
+        'publish',
+        'dirty=false but viewer fingerprint mismatch; sync required',
+        {
+          currentFingerprint: syncCheck.currentFingerprint,
+          baselineFingerprint: syncCheck.baselineFingerprint
+        }
+      )
+    } else {
+      new Notice(
+        'notedrop: 변경 사항이 없습니다. 강제 발행은 Force publish 명령을 사용하세요.',
+        5000
+      )
+    }
     return { status: 'skipped', reason: 'not_dirty' }
   }
   return executePublish(deps, settings)
@@ -299,10 +320,7 @@ export async function executePublish(
       && plan.viewerCacheKey !== null
       && settings.lastViewerCacheKey !== plan.viewerCacheKey
     ) {
-      new Notice(
-        'notedrop: viewer 자산 갱신 필요 - "Sync viewer assets" 명령을 실행하세요',
-        12000
-      )
+      new Notice(VIEWER_SYNC_NOTICE_MESSAGE, VIEWER_SYNC_NOTICE_TIMEOUT_MS)
       deps.logger.info('publish', 'viewer fingerprint mismatch; sync required', {
         currentFingerprint: plan.viewerCacheKey,
         baselineFingerprint: settings.lastViewerCacheKey
