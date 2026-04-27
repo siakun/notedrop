@@ -33,6 +33,16 @@ git tag -d X.Y.Z                 # 로컬 tag 삭제
 gh run rerun <last-run-id>       # release.yml 재실행 → tag 새로 생성됨
 ```
 
+⚠️ **실제 부수 피해 사례 (v0.1.63, 2026-04-28)**: 위 복구 절차가 GitHub REST `releases` listing index 를 corrupted state 로 빠뜨림. 같은 tag 가 짧은 시간에 push → delete → recreate 된 게 trigger. 증상:
+- `releases/latest` REST: 정상 (최신 release 반환)
+- `releases/tags/<v>` REST: 정상
+- GraphQL `repository.releases`: 정상
+- **`releases` listing REST: `[]` empty** — BRAT 의 "Change plugin version" dropdown 이 이 endpoint 를 쓰니까 dropdown 이 옛 버전만 노출.
+- 우회: BRAT 에서 "Latest version" 옵션 (별도 endpoint) 사용 가능.
+- 자연 회복 시간 미상. 추가 release 누적이 index 재구축을 유도할 가능성.
+
+**그러므로**: 위 복구 절차는 **마지막 수단**. tag 동봉 push 자체를 안 하는 게 최선. 복구 후엔 BRAT 등 외부 도구의 listing endpoint 의존 결과를 확인해야 함.
+
 ### 참고
 
 - README.md `### Release` 섹션 — manual tag 폐기 명시 (line 171).
