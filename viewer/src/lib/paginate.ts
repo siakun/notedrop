@@ -198,7 +198,15 @@ export function paginateStrip(
   for (const child of flat) measure.appendChild(child)
   content.innerHTML = ''
   content.appendChild(measure)
-  const heights = flat.map((c) => c.offsetHeight)
+
+  const innerWidthPx = fit.width - fit.padLeft - fit.padRight
+  const expanded = expandLargeParagraphs(
+    measure,
+    flat,
+    { innerWidthPx, innerHeightPx: fit.innerHeight },
+    createPretextMeasurer()
+  )
+  const heights = expanded.map((c) => c.offsetHeight)
   const groups = splitByHeight(heights, fit.innerHeight)
 
   content.innerHTML = ''
@@ -207,7 +215,7 @@ export function paginateStrip(
   for (const group of groups) {
     const page = createPaperPage()
     applyFitDims(page, fit)
-    for (const idx of group) page.appendChild(flat[idx]!)
+    for (const idx of group) page.appendChild(expanded[idx]!)
     strip.appendChild(page)
   }
   content.appendChild(strip)
