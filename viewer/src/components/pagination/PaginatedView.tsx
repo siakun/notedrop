@@ -11,18 +11,21 @@ type PaginatedViewProps = {
 }
 
 /**
- * Zustand pages state 기반 paper-page render. layout 별로 컨테이너 차이:
- *  - vertical: paper-page 들 그대로 children flow.
- *  - horizontal/two-pages: .page-strip 으로 wrap + StripController (useStripNavigation hook).
+ * Zustand pages state 기반 paper-page render. 항상 `<div class="entry-content">`
+ * 으로 wrap — globals.css 의 markdown 스타일 (.entry-content p / h1 등) +
+ * vertical layout 의 flex column + align-items: center + gap 자동 적용.
+ *
+ * layout 별 차이:
+ *  - vertical: .entry-content 안 paper-page 들 직접 children (flex column gap).
+ *  - horizontal/two-pages: .entry-content > .page-strip > paper-page 들 +
+ *    useStripNavigation hook (wheel/keydown/transform).
  */
 export default function PaginatedView({ layout }: PaginatedViewProps) {
   const { pages, fit } = usePaginateResult()
   const stripRef = useRef<HTMLDivElement>(null)
 
-  // strip 이 있는 layout 만 navigation hook 활성
   useStripNavigation(stripRef, layout, pages.length)
 
-  // vertical / default — indicator 숨김 (StripController 가 띄움)
   const setIndicator = useSetIndicator()
   useEffect(() => {
     if (layout === 'vertical' || layout === 'default') {
@@ -32,22 +35,21 @@ export default function PaginatedView({ layout }: PaginatedViewProps) {
 
   if (pages.length === 0) return null
 
-  if (layout === 'horizontal' || layout === 'two-pages') {
-    return (
-      <div className="page-strip" ref={stripRef}>
-        {pages.map((p, i) => (
-          <PaperPage key={i} sourceGroups={p.sourceGroups} fit={fit} />
-        ))}
-      </div>
-    )
-  }
+  const isStrip = layout === 'horizontal' || layout === 'two-pages'
 
-  // vertical
   return (
-    <>
-      {pages.map((p, i) => (
-        <PaperPage key={i} sourceGroups={p.sourceGroups} fit={fit} />
-      ))}
-    </>
+    <div className="entry-content">
+      {isStrip ? (
+        <div className="page-strip" ref={stripRef}>
+          {pages.map((p, i) => (
+            <PaperPage key={i} sourceGroups={p.sourceGroups} fit={fit} />
+          ))}
+        </div>
+      ) : (
+        pages.map((p, i) => (
+          <PaperPage key={i} sourceGroups={p.sourceGroups} fit={fit} />
+        ))
+      )}
+    </div>
   )
 }
