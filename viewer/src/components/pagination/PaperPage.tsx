@@ -61,8 +61,14 @@ export default function PaperPage({ sourceGroups, fit }: PaperPageProps) {
 
   useLayoutEffect(() => {
     const el = ref.current
-    if (!el || !fit) return
-    applyFitDims(el, fit)
+    if (!el) return
+    if (fit) {
+      applyFitDims(el, fit)
+      return
+    }
+    el.style.width = ''
+    el.style.height = ''
+    el.style.padding = ''
   }, [fit])
 
   return <section ref={ref} className="paper-page" />

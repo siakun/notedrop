@@ -12,7 +12,7 @@ import MarkdownRenderer from '@/components/markdown/MarkdownRenderer'
 import PaginatedView from '@/components/pagination/PaginatedView'
 import { useContent } from '@/hooks/useContent'
 import { useCustomCss } from '@/hooks/useCustomCss'
-import { applyFitDims, computeLayout, computePageFit } from '@/lib/paginate'
+import { computeLayout, computePageFit } from '@/lib/paginate'
 import { useSetLayoutResult, useViewSettings } from '@/stores/viewerStore'
 import type { ManifestItem } from '@/types/manifest'
 import type { Manifest } from '@/types/manifest'
@@ -60,7 +60,6 @@ export default function EntryView({
   const { content, error } = useContent(targetHash)
   const settings = useViewSettings()
   const setLayoutResult = useSetLayoutResult()
-  const measurePaperRef = useRef<HTMLElement | null>(null)
   const markdownRootRef = useRef<HTMLElement | null>(null)
   const [viewportTick, setViewportTick] = useState(0)
   const [markdownTick, setMarkdownTick] = useState(0)
@@ -126,11 +125,6 @@ export default function EntryView({
     if (!isPaginate) return
     const root = markdownRootRef.current
     if (!root) return
-    const measureEl = measurePaperRef.current
-    if (measureEl) {
-      const newFit = computePageFit(settings, settings.layout)
-      if (newFit) applyFitDims(measureEl, newFit)
-    }
     const result = computeLayout(root, settings, settings.layout)
     setLayoutResult(result.pages, result.fit)
   }, [
@@ -158,20 +152,29 @@ export default function EntryView({
   const showCover = !chapter && entry.cover
   const isBook = entry.render === 'book'
 
+  const measurePaper = isPaginate ? (
+    <MarkdownRenderer
+      key={renderKey}
+      as="section"
+      className="paper-page"
+      style={measurePaperStyle}
+      body={content.body}
+      pageHash={targetHash}
+      onContentReady={handleContentReady}
+    />
+  ) : null
+
   const measureMarkdown = isPaginate ? (
-    <div aria-hidden="true" style={MEASURE_CONTAINER_STYLE}>
-      <section
-        ref={measurePaperRef}
-        className="paper-page"
-        style={measurePaperStyle}
-      >
-        <MarkdownRenderer
-          key={renderKey}
-          body={content.body}
-          pageHash={targetHash}
-          onContentReady={handleContentReady}
-        />
-      </section>
+    <div
+      aria-hidden="true"
+      className="entry-content"
+      style={MEASURE_CONTAINER_STYLE}
+    >
+      {settings.layout === 'horizontal' || settings.layout === 'two-pages' ? (
+        <div className="page-strip">{measurePaper}</div>
+      ) : (
+        measurePaper
+      )}
     </div>
   ) : null
 

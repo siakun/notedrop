@@ -1,6 +1,12 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties
+} from 'react'
 import { fixAssetPaths, renderMarkdownToHtml } from '@/markdown-pipeline'
 
 let mermaidPromise: Promise<typeof import('mermaid').default> | null = null
@@ -50,6 +56,9 @@ async function runMermaid(root: HTMLElement, signal: () => boolean): Promise<voi
 export type MarkdownRendererProps = {
   body: string
   pageHash?: string
+  as?: 'div' | 'section'
+  className?: string
+  style?: CSSProperties
   /**
    * 렌더 + (옵션) Mermaid 처리 후 호출. paginated layout 이 페이지네이션 진행 시점.
    */
@@ -59,9 +68,12 @@ export type MarkdownRendererProps = {
 export default function MarkdownRenderer({
   body,
   pageHash,
+  as = 'div',
+  className = 'entry-content',
+  style,
   onContentReady
 }: MarkdownRendererProps) {
-  const ref = useRef<HTMLDivElement>(null)
+  const ref = useRef<HTMLElement | null>(null)
   const [error, setError] = useState<Error | null>(null)
   // Hold the latest onContentReady in a ref so the effect doesn't re-run when the
   // parent passes a fresh closure on every render. Without this the effect deps
@@ -70,6 +82,10 @@ export default function MarkdownRenderer({
   useEffect(() => {
     onReadyRef.current = onContentReady
   }, [onContentReady])
+
+  const setRootRef = useCallback((node: HTMLElement | null) => {
+    ref.current = node
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -105,5 +121,23 @@ export default function MarkdownRenderer({
     )
   }
 
-  return <div ref={ref} className="entry-content" data-page-hash={pageHash} />
+  if (as === 'section') {
+    return (
+      <section
+        ref={setRootRef}
+        className={className}
+        style={style}
+        data-page-hash={pageHash}
+      />
+    )
+  }
+
+  return (
+    <div
+      ref={setRootRef}
+      className={className}
+      style={style}
+      data-page-hash={pageHash}
+    />
+  )
 }

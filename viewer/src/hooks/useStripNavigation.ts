@@ -66,6 +66,10 @@ export function useStripNavigation(
   // indicator state 갱신
   useEffect(() => {
     if (!isStrip) return
+    if (total <= 0) {
+      setIndicator({ visible: false, current: 0, total: 0, layout })
+      return
+    }
     setIndicator({ visible: true, current, total, layout })
   }, [isStrip, current, total, layout, setIndicator])
 
