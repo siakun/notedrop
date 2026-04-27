@@ -24,7 +24,10 @@ export class StripController {
       this.viewport.addEventListener('wheel', this.boundWheel, { passive: false })
     }
     document.addEventListener('keydown', this.boundKey)
-    this.update()
+    // 첫 update 는 transition 비활성 — settings (페이지 크기/여백) 변경 시
+    // strip 새로 생성 → 0 → -groupCenter 슬라이딩 깜빡임 회피.
+    // 후속 update (사용자 wheel/key) 는 transition 정상 (페이지 넘기기 효과).
+    this.update(true)
   }
 
   destroy(): void {
@@ -73,7 +76,7 @@ export class StripController {
     this.update()
   }
 
-  private update(): void {
+  private update(skipTransition = false): void {
     const pages = this.strip.querySelectorAll('.paper-page')
     if (pages.length === 0) return
     const pageW = (pages[0] as HTMLElement).offsetWidth
@@ -83,7 +86,19 @@ export class StripController {
     const groupLeft = groupIdx * groupSize * (pageW + gap)
     const groupWidth = groupSize * pageW + (groupSize - 1) * gap
     const groupCenter = groupLeft + groupWidth / 2
-    this.strip.style.transform = `translate(${-groupCenter}px, -50%)`
+
+    if (skipTransition) {
+      this.strip.style.transition = 'none'
+      this.strip.style.transform = `translate(${-groupCenter}px, -50%)`
+      // 강제 layout — transition: none 적용 보장 후 raf 에서 transition 복원
+      void this.strip.offsetHeight
+      requestAnimationFrame(() => {
+        this.strip.style.transition = ''
+      })
+    } else {
+      this.strip.style.transform = `translate(${-groupCenter}px, -50%)`
+    }
+
     this.onIndicator(this.current, this.total, this.layout)
   }
 }
