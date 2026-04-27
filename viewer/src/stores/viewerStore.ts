@@ -28,7 +28,26 @@ type SettingsSlice = {
   resetSettings: () => void
 }
 
-type ViewerStore = SettingsSlice
+export type IndicatorState = {
+  visible: boolean
+  current: number
+  total: number
+  layout: ViewSettings['layout']
+}
+
+type PaginateSlice = {
+  indicator: IndicatorState
+  setIndicator: (state: IndicatorState) => void
+}
+
+type ViewerStore = SettingsSlice & PaginateSlice
+
+const INITIAL_INDICATOR: IndicatorState = {
+  visible: false,
+  current: 0,
+  total: 0,
+  layout: 'default'
+}
 
 /**
  * persist 의 store version. v0.1.53 'auto' → v0.1.54+ 'Auto' 마이그레이션은
@@ -71,7 +90,11 @@ export const useViewerStore = create<ViewerStore>()(
       resetSettings: () => {
         applyViewSettings(VS_DEFAULTS)
         set({ settings: VS_DEFAULTS })
-      }
+      },
+
+      // Paginate slice — indicator 만 1차 단계. lineGroups / pages 는 후속 (v0.1.58).
+      indicator: INITIAL_INDICATOR,
+      setIndicator: (state) => set({ indicator: state })
     }),
     {
       name: VS_STORAGE_KEY,
@@ -113,4 +136,14 @@ export function useViewSettings(): ViewSettings {
 /** Hook — patch 함수만 select. */
 export function usePatchSettings(): (partial: Partial<ViewSettings>) => void {
   return useViewerStore((s) => s.patchSettings)
+}
+
+/** Hook — indicator state. */
+export function useIndicator(): IndicatorState {
+  return useViewerStore((s) => s.indicator)
+}
+
+/** Hook — setIndicator 함수만. */
+export function useSetIndicator(): (state: IndicatorState) => void {
+  return useViewerStore((s) => s.setIndicator)
 }

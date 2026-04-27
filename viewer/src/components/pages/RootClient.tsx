@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { useManifest } from '@/hooks/useManifest'
 import { useRoute } from '@/hooks/useRoute'
 import { usePageSizeCss } from '@/hooks/usePageSizeCss'
@@ -9,7 +8,8 @@ import Home from './Home'
 import EntryView from './EntryView'
 import LiveBadge from '@/components/providers/LiveReloadProvider'
 import BuildInfoBadge from '@/components/providers/BuildInfoBadge'
-import PageIndicator, { type PageIndicatorState } from '@/components/layout/PageIndicator'
+import PageIndicator from '@/components/layout/PageIndicator'
+import { useIndicator } from '@/stores/viewerStore'
 import {
   resolveRoute,
   type ResolvedEntry,
@@ -19,16 +19,14 @@ import {
 /**
  * SPA 진입점 — hash 라우팅 분기 + 글로벌 레이아웃 (header + main + indicator
  * + live badge). 비즈니스 로직 0, hook 조합만.
+ *
+ * indicator state 는 Zustand store (useIndicator). useLayoutPagination 가 직접
+ * dispatch — prop drill 폐기.
  */
 export default function RootClient() {
   const { route, renderToken, mounted } = useRoute()
   const { manifest, error: manifestError } = useManifest()
-  const [indicator, setIndicator] = useState<PageIndicatorState>({
-    visible: false,
-    current: 0,
-    total: 0,
-    layout: 'default'
-  })
+  const indicator = useIndicator()
   usePageSizeCss()
 
   if (!mounted) return null
@@ -46,7 +44,6 @@ export default function RootClient() {
           manifestError={manifestError}
           manifest={manifest}
           renderToken={renderToken}
-          onIndicator={setIndicator}
         />
       </main>
       <PageIndicator state={indicator} />
@@ -61,15 +58,13 @@ function Body({
   resolved,
   manifestError,
   manifest,
-  renderToken,
-  onIndicator
+  renderToken
 }: {
   route: Route
   resolved: ResolvedEntry | null
   manifestError: Error | null
   manifest: ReturnType<typeof useManifest>['manifest']
   renderToken: number
-  onIndicator: (state: PageIndicatorState) => void
 }) {
   if (manifestError) {
     return <div className="error">매니페스트 로드 실패: {manifestError.message}</div>
@@ -94,7 +89,6 @@ function Body({
       chapters={resolved.chapters}
       manifest={manifest}
       renderToken={renderToken}
-      onIndicator={onIndicator}
     />
   )
 }

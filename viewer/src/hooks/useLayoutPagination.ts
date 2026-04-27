@@ -9,12 +9,12 @@ import {
 import { StripController } from '@/lib/stripController'
 import { logger } from '@/lib/logger'
 import type { ViewSettings } from '@/types/viewSettings'
-import type { PageIndicatorState } from '@/components/layout/PageIndicator'
+import { useSetIndicator } from '@/stores/viewerStore'
 
 const RESIZE_DEBOUNCE_MS = 200
 
 /**
- * Markdown 렌더 완료 후 layout 모드별 페이지네이션 + PageIndicator 상태 갱신.
+ * Markdown 렌더 완료 후 layout 모드별 페이지네이션 + indicator state 갱신.
  * line-단위 paginate 알고리즘 (lib/lineStream.ts) 사용.
  *
  * Layout 별 동작:
@@ -23,6 +23,8 @@ const RESIZE_DEBOUNCE_MS = 200
  *  - horizontal/two-pages: paginateStrip + StripController (가상 가로 스크롤).
  *    indicator 표시.
  *
+ * indicator state 는 Zustand store (useSetIndicator). prop 통한 callback 폐기.
+ *
  * window resize listener (debounce 200ms): viewport 변경 시 markdown 재처리 X,
  * paginate 만 다시 호출 (lastRootRef 사용). settings 변경 흐름과 동일 진입점
  * (runPaginate) — 일관된 cleanup + paginate 재실행.
@@ -30,9 +32,9 @@ const RESIZE_DEBOUNCE_MS = 200
  * StripController 인스턴스는 ref 보관, layout 변경/unmount 시 자동 destroy.
  */
 export function useLayoutPagination(
-  settings: ViewSettings,
-  onIndicator: (state: PageIndicatorState) => void
+  settings: ViewSettings
 ): { handleContentReady: (root: HTMLElement) => void } {
+  const setIndicator = useSetIndicator()
   const stripControllerRef = useRef<StripController | null>(null)
   const lastRootRef = useRef<HTMLElement | null>(null)
 
@@ -46,7 +48,7 @@ export function useLayoutPagination(
 
       if (settings.layout === 'vertical') {
         paginateVertical(root, settings)
-        onIndicator({ visible: false, current: 0, total: 0, layout: settings.layout })
+        setIndicator({ visible: false, current: 0, total: 0, layout: settings.layout })
         logger.debug('paginate', 'vertical 적용', {
           pageSize: settings.pageSize
         })
@@ -56,7 +58,7 @@ export function useLayoutPagination(
       if (settings.layout === 'horizontal' || settings.layout === 'two-pages') {
         const result = paginateStrip(root, settings, settings.layout)
         if (!result) {
-          onIndicator({ visible: false, current: 0, total: 0, layout: settings.layout })
+          setIndicator({ visible: false, current: 0, total: 0, layout: settings.layout })
           logger.warn('paginate', 'paginateStrip 실패 (computePageFit null)')
           return
         }
@@ -65,7 +67,7 @@ export function useLayoutPagination(
           settings.layout,
           result.totalPages,
           (current, total, layout) =>
-            onIndicator({ visible: true, current, total, layout })
+            setIndicator({ visible: true, current, total, layout })
         )
         stripControllerRef.current = controller
         logger.debug('paginate', `${settings.layout} 적용`, {
@@ -74,9 +76,9 @@ export function useLayoutPagination(
         return
       }
 
-      onIndicator({ visible: false, current: 0, total: 0, layout: settings.layout })
+      setIndicator({ visible: false, current: 0, total: 0, layout: settings.layout })
     },
-    [settings, onIndicator]
+    [settings, setIndicator]
   )
 
   // window resize → debounced re-paginate. markdown 재처리 X.

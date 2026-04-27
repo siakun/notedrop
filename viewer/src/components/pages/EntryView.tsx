@@ -8,7 +8,6 @@ import { useCustomCss } from '@/hooks/useCustomCss'
 import { useLayoutPagination } from '@/hooks/useLayoutPagination'
 import type { ManifestItem } from '@/types/manifest'
 import type { Manifest } from '@/types/manifest'
-import type { PageIndicatorState } from '@/components/layout/PageIndicator'
 import Toc from '@/components/book/Toc'
 import ChapterNav from '@/components/book/ChapterNav'
 
@@ -18,7 +17,6 @@ export type EntryViewProps = {
   chapters: ManifestItem[]
   manifest: Manifest
   renderToken: number
-  onIndicator: (state: PageIndicatorState) => void
 }
 
 /**
@@ -33,8 +31,7 @@ export default function EntryView({
   chapter,
   chapters,
   manifest,
-  renderToken,
-  onIndicator
+  renderToken
 }: EntryViewProps) {
   void manifest
   const target = chapter ?? entry
@@ -62,7 +59,7 @@ export default function EntryView({
   )
 
   useCustomCss(targetHash, content?.frontmatter.customCss ?? null)
-  const { handleContentReady } = useLayoutPagination(settings, onIndicator)
+  const { handleContentReady } = useLayoutPagination(settings)
 
   if (error) {
     return <div className="error">콘텐츠 로드 실패: {error.message}</div>
