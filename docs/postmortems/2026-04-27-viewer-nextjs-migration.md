@@ -146,7 +146,7 @@ spec §5.1 의 isomorphic-git 가정에서 Tree API 로 변경. 트레이드오�
 | blob 한계 | git 100MB | 5MB 추천 (LFS v2) |
 | OS 호환 | 같음 (lib 자체 구현) | 같음 (fetch) |
 
-vault 사이드카 회피 (ADR-0018) 와 정합성, 의존 없음 가 가장 큰 가치. dogfood 단계 (본인 한정) rate limit 충분. 다중 사용자 시 재평가는 v2.
+vault 사이드카 회피 (ADR-0018) 와의 정합성, 의존 없음이 가장 큰 가치. dogfood 단계 (본인 한정) rate limit 충분. 다중 사용자 시 재평가는 v2.
 
 ### 4.3 viewer 자산 = zip 인라인 (옵션 B)
 
@@ -169,7 +169,7 @@ dogfood 에서 발견된 한계: 사용자 publish 후 새 hash 가 main 의 vie
 - GH Pages: deploy.yml 가 manifest 변경 후 자동 재빌드 → 정상
 - PreviewServer (옵시디언 안): 새 hash 의 정적 HTML 없음 → 404
 
-회유: hash fragment 라우팅 (`#/<slug-or-hash>/`). 단일 `app/page.tsx` 가 client 측에서 `location.hash` 파싱 → home/entry 분기. dynamic route 폐기. URL 의 path 형식은 잃지만 publish 후 즉시 viewer 진입 가능 + viewer 가 1 페이지만 export 라 빌드 시간/사이즈 절감.
+우회책: hash fragment 라우팅 (`#/<slug-or-hash>/`). 단일 `app/page.tsx` 가 client 측에서 `location.hash` 파싱 → home/entry 분기. dynamic route 폐기. URL 의 path 형식은 잃지만 publish 후 즉시 viewer 진입 가능 + viewer 가 1 페이지만 export 라 빌드 시간/사이즈 절감.
 
 plugin 의 `copyShareUrl` 도 같은 형식 (`<base>/#/<slug>/`). ContentTransformer 의 wikilink 변환도 `[text](#/<slug>/)`.
 
@@ -179,7 +179,7 @@ P3 초기 안: rehype-react 로 mdast → React 트리 + 컴포넌트 매핑 (Ca
 
 P9 (§13 회복) 시 발견: paginateVertical/paginateStrip 가 div.entry-content 의 children 을 측정 + 여러 paper-page 로 *재분배* 의무. React 가 children 을 reconciliation 으로 관리하면 DOM 직접 조작과 충돌 (key 변경 시 unmount 발생, ref 안정성 X).
 
-회유: rehype-stringify 로 HTML string 받아 `dangerouslySetInnerHTML` 삽입. 페이지네이션 함수가 div 의 children 을 자유롭게 옮길 수 있음 (React 가 그 안 children 안 봄). 콜아웃·임베드 placeholder 등은 CSS attr() 매핑 (`.callout::before { content: attr(data-callout-title); }`).
+우회책: rehype-stringify 로 HTML string 받아 `dangerouslySetInnerHTML` 삽입. 페이지네이션 함수가 div 의 children 을 자유롭게 옮길 수 있음 (React 가 그 안 children 안 봄). 콜아웃·임베드 placeholder 등은 CSS attr() 매핑 (`.callout::before { content: attr(data-callout-title); }`).
 
 Mermaid 만 useEffect 안에서 `mermaid.render(id, source)` 호출 후 svg 삽입 (`<pre.mermaid data-source="...">` → `<div.mermaid-rendered>` 교체).
 
@@ -192,7 +192,7 @@ P5 초기 안: paged.js 로 paper-page 분할 + page CSS @page 적용. dynamic i
 
 이는 paged.js 의 column 기반 분할과 mismatch. paged.js 가 단일 source HTML 을 column 단위로 chunk. backup vanilla 의 패턴은 *element 단위 height 누적* 방식. 매핑 어려움.
 
-회유: paged.js 의존 폐기 (~수백 KB 절감) + backup 의 splitByHeight + measure-render 패턴 그대로 React 안에 이식 (lib/paginate.ts).
+우회책: paged.js 의존 폐기 (~수백 KB 절감) + backup 의 splitByHeight + measure-render 패턴 그대로 React 안에 이식 (lib/paginate.ts).
 
 ### 4.7 GH Pages 자동 활성화 (대안 불가능, 사용자 1 회 작업)
 
@@ -286,7 +286,7 @@ publish 흐름:
 
 M4 의 vanilla 자율 ADR-0026 이 spec §5.2/§5.4 의 Next.js + React + unified.js 골격을 전부 누락. 사후 정당화 ("autonomous run 단순화") 가 macro 결정을 뒤집을 권한이 아님. 메모리 가드레일 정착:
 
-> Spec macro 결정 자율 변경 금지: 기술 스택·라이브러리 / 폴더 구조 / 아키텍처 패턴 / MVP 범위. 자율 ADR 작성 시 status 는 반드시 "Proposed, 사용자 검토 필요". 외부 강제 (BRAT, GitHub API 한계, OS 호환) 는 ADR + Accepted OK.
+> Spec macro 결정 자율 변경 금지: 기술 스택·라이브러리 / 폴더 구조 / 아키텍처 패턴 / MVP 범위. 자율 ADR 작성 시 status 는 반드시 "Proposed, 사용자 검토 필요". 외부 강제 (BRAT, GitHub API 한계, OS 호환) 는 ADR + Accepted 무방.
 
 ### 7.2 dogfood 가 사양을 형성
 
@@ -302,7 +302,7 @@ backup-vanilla-viewer 브랜치에 v0.1.24 vanilla 전체 보존 (main 의 viewe
 
 v0.1.25 release.yml fail. P1~P7 통합 빌드 검증 후 push 했지만 publishVault.ts 의 vanilla import 잔재 발견. 통합 빌드 (`cd plugin && npm run build` + 211 단위 테스트) 가 P7 끝에서 통과했음에도 — release.yml 의 prod build (NODE_ENV=production) 가 다른 import resolution. 
 
-실 release tag push 후에야 발견. 회유: tag 0.1.25 origin 삭제 + 0.1.26 새 release. 단순한 회유지만 release entry 가 안 만들어진 시점에 즉시 발견됐기에 가능.
+실 release tag push 후에야 발견. 우회책: tag 0.1.25 origin 삭제 + 0.1.26 새 release. 단순한 우회책이나 release entry 가 미생성된 시점에 즉시 발견됐기에 가능.
 
 교훈: release.yml 의 모든 단계를 로컬에서 재현하는 검증 스크립트가 필요. `cd plugin && NODE_ENV=production npm run build` 로컬 재현 시 발견 가능했음.
 

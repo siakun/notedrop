@@ -19,7 +19,7 @@ summary: vault에 사이드카 파일 절대 X (frontmatter 토글만). 캐시�
 - 발행 로그 (vault 루트의 `.notedrop-log` 등)
 - 변환 결과 캐시 (`<note>.cache.md` 등)
 
-사용자 강한 요구: *vault 깨끗하게 유지. 추가 파일 X*.
+사용자 강한 요구: *vault 청정 상태 유지. 추가 파일 X*.
 
 또한 캐시 정책 결정 필요:
 - 라이브 미리보기에서 같은 콘텐츠 반복 fetch 시 매번 변환 vs 캐시 사용
@@ -74,7 +74,7 @@ summary: vault에 사이드카 파일 절대 X (frontmatter 토글만). 캐시�
 ## Consequences
 
 긍정:
-- vault 깨끗하게 유지 (프론트매터 한 줄 외 변경 X)
+- vault 청정 상태 유지 (프론트매터 한 줄 외 변경 X)
 - 사이드카 파일 → vault git 동기 부담 0
 - 캐시 invalidation 버그 표면적 작음 (인메모리 + 이벤트 기반)
 - 옵시디언 종료 시 모든 임시 데이터 자동 정리
@@ -90,7 +90,7 @@ summary: vault에 사이드카 파일 절대 X (frontmatter 토글만). 캐시�
 각 발행된 노트 옆에 발행 상태·hash·통계 저장.
 
 거부 사유:
-- vault 깨끗 유지 위배
+- vault 청정 유지 위배
 - 노트 1개당 파일 2개 → 옵시디언 검색·grep 노이즈
 - frontmatter 와 사이드카 sources of truth 분리 → 동기 버그 위험
 

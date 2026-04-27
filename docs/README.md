@@ -23,7 +23,7 @@ summary: notedrop 프로젝트 spec 디렉터리 인덱스. arc42 13개 + 프로
 
 ## 문서 패턴
 
-[arc42](https://docs.arc42.org/) 12 섹션 + [ADR (Architecture Decision Records)](https://adr.github.io/) 결정 명문화조합. 메인 문서는 *현재 상태* 를, ADR은 *왜 그렇게 됐는지의 시간 축 기록* 을 담는다. 채택 이유는 [decisions/0024-arc42-adr-문서-패턴-채택.md](decisions/0024-arc42-adr-문서-패턴-채택.md) 참조.
+[arc42](https://docs.arc42.org/) 12 섹션 + [ADR (Architecture Decision Records)](https://adr.github.io/) 결정 명문화의 조합. 메인 문서는 *현재 상태* 를, ADR은 *결정 경위의 시간 축 기록* 을 담는다. 채택 이유는 [decisions/0024-arc42-adr-문서-패턴-채택.md](decisions/0024-arc42-adr-문서-패턴-채택.md) 참조.
 
 ## 인덱스
 

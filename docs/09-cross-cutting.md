@@ -16,13 +16,13 @@ summary: 누설 방지 다층 방어, 에러 처리, 안전장치, race conditio
 
 ## 9.1 비공개 누설 방지 (다층 방어)
 
-겹쳐서 막아야 한 layer 깨져도 다음이 잡음.
+중첩 방어 - 한 layer 가 깨져도 다음 layer 가 차단.
 
 | 레이어 | 무엇을 막는가 |
 |---|---|
 | **화이트리스트 강제** | `notedrop-publish: true` 없으면 PublishIndex 에 들어가지 않음. 발행 코드 경로에 진입 자체 X |
 | **단일 소스 (PublishIndex)** | 모든 ref 해석은 PublishIndex 조회로만. 인덱스에 없으면 무조건 unpublished 처리 (안전장치 발동) |
-| **Frontmatter sanitize** | public 출력 frontmatter 는 plugin 이 명시적으로 채우는 필드만 (notedrop-* 와 derive). vault frontmatter 의 다른 키는 절대 안 새어 나감 |
+| **Frontmatter sanitize** | public 출력 frontmatter 는 plugin 이 명시적으로 채우는 필드만 (notedrop-* 와 derive). vault frontmatter 의 다른 키는 유출되지 않음 |
 | **본문 HIDE 적용** | `%%주석%%`, Waypoint 블록, vault frontmatter 영역 - 변환 단계에서 제거 |
 | **발행 직전 재검증** | git push 직전 한 번 더 PublishIndex 조회. 시점 차이로 unpublished 됐으면 abort |
 | **Public 레포 격리** | 2-레포 구조 자체가 하드 격리. private vault 레포에서 public 레포로 push 할 때만 누설 가능, 그 push 코드만 감사하면 됨 |

@@ -110,7 +110,7 @@ GitPublisher.publish:
 ### 3. Force-push 옵션 X (충돌 시 무조건 사용자 수동 해결)
 
 거부 사유:
-- 사용자가 git 잘 모를 수 있음
+- 사용자의 git 숙련도가 낮을 수 있음
 - 명시적 force 옵션이 한 번 클릭으로 해결 가능 (위험 인지 모달과 함께)
 
 ### 4. 매 publish 마다 squash·force-push

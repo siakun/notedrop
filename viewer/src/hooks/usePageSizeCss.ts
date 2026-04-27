@@ -10,7 +10,7 @@ import { mmToPx } from '@/lib/paginate'
  * settings 의 layout/pageSize/margin* 변경 시 자동 update. paper-page 컴포넌트
  * 가 이 변수 사용 → 사이즈 변경 시 즉시 반영.
  *
- * Default layout 은 paper-page 안 쓰므로 변수 미사용 — 단 박아도 무해.
+ * Default layout 은 paper-page 미사용이라 변수 미참조 — 단 설정해도 무해.
  */
 export function usePageSizeCss(): void {
   const { settings } = useViewSettings()

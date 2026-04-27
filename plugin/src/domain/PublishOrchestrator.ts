@@ -14,8 +14,8 @@ export type PublishPlan = {
   manifest: Manifest
   warnings: string[]
   /** viewer 자산 fingerprint cache key — cache hit 시 plan.files 에
-   * cached entry 존재고 이 키 가 confirmPublished 시 settings 존재.
-   * cache miss 면 cacheKey 만 박히고 entries 는 전체 unpack. null 이면
+   * cached entry 가 존재하고, 이 키가 confirmPublished 시점에 settings 에 저장.
+   * cache miss 면 cacheKey 만 기록되고 entries 는 전체 unpack. null 이면
    * publishViewerAssets=false 인 케이스. */
   viewerCacheKey?: string | null
   viewerCacheHit?: boolean

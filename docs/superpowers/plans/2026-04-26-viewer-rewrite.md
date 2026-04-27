@@ -38,7 +38,7 @@
 
 **시사점**:
 - viewer 의 unified pipeline 은 wikilink/embed/image **plugin 불필요**. ContentTransformer 가 이미 처리 완료.
-- unified pipeline 의 remark-rehype 단계에서 `allowDangerousHtml: true` + `rehype-raw` 사용 의무 (HTML 패스스루). 안 하면 dead-link span/embed placeholder 가 텍스트로 새어나감.
+- unified pipeline 의 remark-rehype 단계에서 `allowDangerousHtml: true` + `rehype-raw` 사용 의무 (HTML 패스스루). 미적용 시 dead-link span/embed placeholder 가 텍스트로 노출.
 - viewer 의 CSS 가 `.notedrop-deadlink`, `.notedrop-embed-placeholder`, `.notedrop-embed-overflow` 클래스 스타일 정의 의무.
 - DOMPurify 쓸 거면 위 3 클래스 + `<img>` 허용 필요.
 
@@ -56,7 +56,7 @@ Next.js 14+ `output: 'export'` 에서 `app/[hash]/page.tsx` 같은 dynamic route
 
 **3 옵션**:
 - **A. Manifest-driven build**: `generateStaticParams` 가 빌드 시점에 `viewer/public/manifest.json` 읽어 모든 hash path 사전 생성. publish 마다 GH Actions 가 (a) Tree API push 후 (b) viewer 재빌드 trigger 의무. 단점: deploy 1~5분 추가.
-- **B. Single page + URL 라우팅**: `app/page.tsx` 하나만, hash 또는 query string 으로 클라이언트 라우팅. dynamic route 안 씀. URL 형태: `https://siakun.github.io/notedrop/?hash=abc` 또는 `/#/abc`. ADR-0011 의 "/[hash]" path 명시 정신 위배 하지만 ADR-0011 본문 "라우팅: SPA 클라이언트 사이드" 와는 정합.
+- **B. Single page + URL 라우팅**: `app/page.tsx` 하나만, hash 또는 query string 으로 클라이언트 라우팅. dynamic route 미사용. URL 형태: `https://siakun.github.io/notedrop/?hash=abc` 또는 `/#/abc`. ADR-0011 의 "/[hash]" path 명시 정신 위배하지만 ADR-0011 본문 "라우팅: SPA 클라이언트 사이드" 와는 정합.
 - **C. Hybrid**: `app/page.tsx` (홈) + `app/entry/page.tsx` (단일 entry 페이지, query string 으로 hash 받음). URL: `/notedrop/entry?hash=abc`. dynamic route 회피, path 직관성 약간 회복.
 
 **plan 결정**: **옵션 A (manifest-driven build)** 채택. URL 미적·공유 가치 + ADR-0011 의 spec ref 정합. 단점은 publish flow 에서 GH Actions 재빌드 trigger 필요 — 본 plan 의 P7 (PreviewServer + esbuild + deploy.yml) 에서 같이 처리. publish (Tree API) 가 viewer/public/manifest.json 만 갱신하므로 deploy.yml trigger paths 에 `viewer/public/**` 추가하면 자동 재빌드.
@@ -99,7 +99,7 @@ LiveReloadProvider 가 dev 환경 (= localhost:4321) 에서만 EventSource 연�
 
 ## Phase 분할
 
-각 phase 는 (1) 코드 작성, (2) 단위 테스트 (가능한 한도), (3) 검증 명령, (4) commit 1+개. main 의 빌드 가능 상태는 P7 끝까지 깨질 수 있음 (P0~P6 진행 동안 plugin/src/embedded/ 가 stale 상태). 안전 commit boundary 는 P7 종료 시점.
+각 phase 는 (1) 코드 작성, (2) 단위 테스트 (가능한 한도), (3) 검증 명령, (4) commit 1+개. main 의 빌드 가능 상태는 P7 종료까지 깨질 수 있음 (P0~P6 진행 동안 plugin/src/embedded/ 가 stale 상태). 안전 commit boundary 는 P7 종료 시점.
 
 | Phase | Tasks | 산출물 | main 작동 |
 |---|---|---|---|
@@ -113,7 +113,7 @@ LiveReloadProvider 가 dev 환경 (= localhost:4321) 에서만 EventSource 연�
 | **P7. 통합 (PreviewServer + esbuild + deploy.yml)** | 5 | esbuild embedViewerAssets() Next.js out/ 대응, PreviewServer Next.js export 산출물 서빙, deploy.yml 신규 작성, viewer/build.mjs 삭제 | **OK 회복** |
 | **P8. 검증 + dogfood 준비** | 3 | viewer 단위 테스트, 통합 빌드, README 갱신 | OK |
 
-총 37 tasks. 본 plan 의 main 작동 가능 commit boundary 는 P0 끝 + P7 끝 (+ P8). P1~P6 는 work-in-progress, 다음 phase 가 이어지지 않으면 main 깨진 상태로 잠.
+총 37 tasks. 본 plan 의 main 작동 가능 commit boundary 는 P0 종료 + P7 종료 (+ P8). P1~P6 는 work-in-progress, 다음 phase 가 이어지지 않으면 main 깨진 상태로 세션 종료.
 
 **완화책**: P1~P6 동안 임시로 vanilla 산출물을 plugin/src/embedded/ 에 그대로 두고 (P1 에서도 viewer/dist/ 보존), P7 에서만 swap. 즉 P1 이 viewer/src/ 만 교체, viewer/dist/ + plugin/src/embedded/ 는 P7 까지 유지. BRAT 사용자가 받는 plugin = vanilla 그대로 작동. dogfood 진행에 막힘 0.
 

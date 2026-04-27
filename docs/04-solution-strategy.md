@@ -28,7 +28,7 @@ summary: 전체 시스템을 결정하는 큰 전략적 선택 6개의 요약과
 
 볼트 레포 (`siakun/obsidian-personal`, private) 와 발행 레포 (`siakun/notedrop`, public) 를 분리. 플러그인이 발행 시 두 번째 레포로 git push.
 
-이유: GH Pages 무료 티어 제약 + 사고 위험 구조적 격리. 비공개 일기가 들어 있는 레포에서 public Pages 를 쏘려면 멘탈 모델·실수 위험이 큼. 두 레포로 자르면 ‟public 레포에 들어간 것만 공개" 가 git 자체로 보장됨.
+이유: GH Pages 무료 티어 제약 + 사고 위험 구조적 격리. 비공개 일기가 포함된 레포에서 public Pages 를 발행하면 멘탈 모델·실수 위험이 큼. 두 레포로 분리하면 "public 레포에 포함된 것만 공개" 가 git 자체로 보장됨.
 
 상세: [decisions/0001-2-레포-구조.md](decisions/0001-2-레포-구조.md)
 
@@ -93,5 +93,5 @@ summary: 전체 시스템을 결정하는 큰 전략적 선택 6개의 요약과
 | Approach C (플러그인이 빌드까지) | 플러그인 안에 Next.js 번들 = 수십 MB, 모바일 불가, 책임 경계 무너짐 |
 | SSG (페이지마다 HTML 미리 생성) | dev/prod 모드 분기 발생, 빌드 시간 누적 |
 | 노션 같은 백엔드 모델 | 비용 + 운영 부담 + 정체성 (정적 사이트가 아닌 동적 SaaS) |
-| Quartz, MkDocs, Hugo 등 기존 정적 사이트 도구 차용 | 책 뷰어 (paged.js + 사이즈 선택 + PDF) 정체성 만족 어려움. UX 개선드 책 UX 가 1차 목표 |
+| Quartz, MkDocs, Hugo 등 기존 정적 사이트 도구 차용 | 책 뷰어 (paged.js + 사이즈 선택 + PDF) 정체성 만족 어려움. UX 가 개선된 책 UX 가 1차 목표 |
 | 옵시디언 임베드된 마크다운 미리보기 (별도 뷰어 X) | 페이지 사이즈·PDF·고급 렌더 없음. Reader 가 옵시디언 설치 없이 봐야 한다는 핵심 요구 미충족 |

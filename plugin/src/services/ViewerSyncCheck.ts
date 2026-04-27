@@ -49,7 +49,7 @@ export function checkViewerFingerprintMismatch(
     }
   }
   if (VIEWER_FINGERPRINT === '') {
-    // viewer 빌드 안 한 상태 — fingerprint 비교 의미 X
+    // viewer 미빌드 상태 — fingerprint 비교 의미 X
     return {
       needsSync: false,
       currentFingerprint: null,
@@ -65,7 +65,7 @@ export function checkViewerFingerprintMismatch(
   const baseline = settings.lastViewerCacheKey
   if (baseline === null) {
     // 첫 publish 또는 baseline reset — sync 의무 X. publishVault 의 전체
-    // push 가 자동으로 viewer 자산 새로 갱신.
+    // push 가 자동으로 viewer 자산 갱신.
     return {
       needsSync: false,
       currentFingerprint: current,

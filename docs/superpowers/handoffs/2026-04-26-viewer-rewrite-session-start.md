@@ -112,7 +112,7 @@ viewer/package.json version: 0.1.25 (vanilla 마지막 0.1.24 → next.js 시작
 
 > Plan `docs/superpowers/plans/2026-04-26-viewer-rewrite.md` P1 부터 진행. 본 세션 핸드오프 (`docs/superpowers/handoffs/2026-04-26-viewer-rewrite-session-start.md`) §2 의 spec 공백 결정 8건 (특히 #3 dynamic route, #7 viewer 자산 인라인 옵션, #8 deploy.yml) 을 작업 전 사용자에게 짧게 confirm 받고 진행. P1~P3 한 세션 내 commit, P4~P5 다음 세션, P6~P7 다음 세션, P8 dogfood. main push 시점 (P7 끝) 사용자 승인. Auto mode 가정.
 
-## 8. 본 세션이 못한 것 + 사과
+## 8. 본 세션 미수행 항목 + 사유
 
 본 세션은 macro 결정 명문화(ADR Status) + plan 작성 + 사전 조사 P0.1 까지. 실 viewer 코드 0 줄 작성. 사유: spec §11.1.2 풀 기능 (KaTeX, Mermaid, paged.js, customCss 격리, 페이지 사이즈, PDF, 라이브 reload, 옵시디언 코어 풀 셋) 을 단일 세션 (수 시간) 내 구현 + 검증 어려움. 또 main 작동 가능 commit boundary (P7 끝) 까지 도달 못 하면 main 깨진 상태로 잠 → BRAT dogfood 막힘. 따라서 plan + 핸드오프로 다음 세션에 인계가 안전 결정.
 

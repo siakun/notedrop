@@ -67,7 +67,7 @@ URL: `siakun.github.io/notedrop/<hash>`
 
 부정:
 - "drop" 단어가 일반적이라 npm·GitHub 검색 시 노이즈 약간
-- 다른 도구의 "notedrop" 과 헷갈릴 가능성 (큰 위험은 아님 - 옵시디언 플러그인 마켓 안에서만 unique 하면 됨)
+- 다른 도구의 "notedrop" 과 혼동될 가능성 (큰 위험은 아님 - 옵시디언 플러그인 마켓 안에서만 unique 하면 됨)
 
 ## Alternatives Considered
 
@@ -108,7 +108,7 @@ URL: `siakun.github.io/notedrop/<hash>`
 - 사용자 가이드 갱신
 - 옵시디언 플러그인 ID 변경 (재등록)
 
-비용 큼. 처음에 신중히 정하고 안 바꾸는 게 좋음. `notedrop` 으로 확정.
+비용 큼. 초기에 신중히 정하고 변경하지 않는 편이 적절. `notedrop` 으로 확정.
 
 ## Related
 

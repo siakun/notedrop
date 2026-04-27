@@ -75,7 +75,7 @@ summary: MVP 범위, v2 후보, 영구 비-목표, release readiness gate, M1 ~ 
 
 ## 11.2 의도적 비포함 (v2)
 
-지금 *안 함*. v2 에서 검토.
+현 시점 *미수행*. v2 에서 검토.
 
 | 기능 | 사유 |
 |---|---|
@@ -207,4 +207,4 @@ summary: MVP 범위, v2 후보, 영구 비-목표, release readiness gate, M1 ~ 
 | Next.js export + 'use client' 조합에서 라우팅 quirk | M3 에서 발견 가능 | 단순 SPA 라우팅으로 폴백 (next/link 대신 자체 라우팅) |
 | Obsidian Plugin 환경의 Node http 모듈 quirk | M3 에서 발견 가능 | Local REST API 플러그인 코드 참고, 선례 패턴 차용 |
 | TDD 루프가 옵시디언 GUI 테스트 어려움 | M2 부터 | E2E 는 수동, automation 은 헤드리스 viewer 만 |
-| Yak Shaving (vault 컨벤션·리팩터링 빠짐) | 전체 | 11.4 release gate 외엔 v2 backlog 로 보류 |
+| Yak Shaving (vault 컨벤션·리팩터링 누락) | 전체 | 11.4 release gate 외엔 v2 backlog 로 보류 |

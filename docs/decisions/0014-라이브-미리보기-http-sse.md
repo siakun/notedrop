@@ -87,7 +87,7 @@ summary: 라이브 미리보기 = Node http 서버 + SSE. npm run dev 시뮬 X. 
 ### 2. WebSocket 으로 SSE 대신
 
 거부 사유:
-- 단방향 (서버 → 브라우저) 만 필요. WebSocket 은 양방향 (오버킬)
+- 단방향 (서버 → 브라우저) 만 필요. WebSocket 은 양방향 (과잉)
 - SSE 는 HTTP 위에서 작동, 단순
 
 ### 3. Polling
@@ -129,7 +129,7 @@ sse.addEventListener('changed', (e) => {
 })
 ```
 
-prod 에서는 `/__events` 가 없어 EventSource 가 fail → LiveReloadProvider 가 try-catch.
+prod 에서는 `/__events` 가 없어 EventSource 가 실패 → LiveReloadProvider 가 try-catch.
 
 ## 외부 에디터로 vault 수정해도 작동하는가
 

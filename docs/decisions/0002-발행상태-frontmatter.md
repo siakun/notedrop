@@ -55,9 +55,9 @@ C. 별도 `published` 브랜치 - 공개 순간 cherry-pick
 `.obsidian/plugins/notedrop/published.json` 에 `[hash, path, ...]` 리스트.
 
 거부 사유:
-- 노트 본문은 깨끗하지만 매니페스트 자체도 git 동기 필요. 결국 비슷한 noise
-- 노트 보고만은 발행 여부 모름 (외부 에디터 친화 X)
-- 매니페스트와 실제 frontmatter 가 어긋날 수 있음 (멀티 sources of truth)
+- 노트 본문은 깨끗하지만 매니페스트 자체도 git 동기 필요. 결국 유사한 noise
+- 노트만 봐서는 발행 여부 알 수 없음 (외부 에디터 친화 X)
+- 매니페스트와 실제 frontmatter 가 어긋날 수 있음 (multiple sources of truth)
 
 ### C. 별도 published 브랜치
 

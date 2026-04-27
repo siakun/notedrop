@@ -23,7 +23,7 @@ export type ResolvedEntry = {
  *  - home → null (Home 컴포넌트가 처리)
  *  - entry hash → manifest 에서 찾기 (slug fallback)
  *  - chapter hash → 부모 book 으로 redirect + chapter 활성
- *  - 못 찾음 → null (404 표시)
+ *  - 미발견 → null (404 표시)
  */
 export function resolveRoute(
   route: Route,

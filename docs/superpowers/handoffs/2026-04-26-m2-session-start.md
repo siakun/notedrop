@@ -7,7 +7,7 @@ tags:
   - notedrop
   - m2
   - handoff
-summary: M1 완료 후 새 세션에서 M2 (Infrastructure 통합 + BRAT 배포) 를 컨텍스트 손실 없이 시작하기 위한 프롬포트 + 결정 사항 기록
+summary: M1 완료 후 새 세션에서 M2 (Infrastructure 통합 + BRAT 배포) 를 컨텍스트 손실 없이 시작하기 위한 프롬프트 + 결정 사항 기록
 ---
 # Notedrop M2 핸드오프
 
@@ -18,7 +18,7 @@ summary: M1 완료 후 새 세션에서 M2 (Infrastructure 통합 + BRAT 배포)
 ## 0. 컨텍스트
 
 작업 디렉터리: `C:\Users\User\Documents\github_siakun\notedrop`
-원격: `https://github.com/siakun/notedrop` (origin/main, force-push 끝)
+원격: `https://github.com/siakun/notedrop` (origin/main, force-push 완료)
 M1 완료 태그: `m1-domain-complete` (한국어 commit 25개)
 백업 (M1 영문 버전): 태그 `m1-domain-complete-en-backup` + 브랜치 `backup-main-en`
 

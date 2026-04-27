@@ -30,7 +30,7 @@ spec §5.4 의 building-blocks 트리는 모든 plugin 파일이 `plugin/` 하�
 
 | 옵션 | 장점 | 단점 |
 |---|---|---|
-| A. plugin/manifest.json 유지 + BRAT 분기 | spec 그대로 | BRAT 가 root 만 봐 작동 X. 공식 plugin store 도 root 요구 |
+| A. plugin/manifest.json 유지 + BRAT 분기 | spec 그대로 | BRAT 가 root 만 인식하므로 작동 X. 공식 plugin store 도 root 요구 |
 | B. manifest.json 을 root 로 이동 | BRAT/공식 store 모두 호환 | spec §5.4 트리 변경 필요 |
 | C. root 에 symlink + plugin/manifest.json 원본 유지 | spec 유지 | git 의 symlink Windows 호환성 취약, GH 가 raw.githubusercontent 로 따라가지 않음 |
 | D. 서브트리 별도 repo 분리 | 표준 layout | 모노레포 ADR-0013 위배, 통합 개발 흐름 손상 |

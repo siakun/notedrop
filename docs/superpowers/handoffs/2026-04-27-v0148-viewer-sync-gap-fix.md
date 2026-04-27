@@ -150,7 +150,7 @@ run id `24971742100` background monitoring 진행.
 - 사용자 vault에서 *실제 sync viewer assets 실행 후 cache hit 측정* —
   share repo 의 commit 부작용. 사용자 명시 의무 (현
   세션의 *직접 코딩* 의도, 부작용 최소화)
-- viewer UI 의 visual 검증 — `playwright-skill` 또는 `browser-use` 회유
+- viewer UI 의 visual 검증 — `playwright-skill` 또는 `browser-use` 우회책
 
 ## 8. 다음 세션 의무
 
@@ -182,5 +182,5 @@ run id `24971742100` background monitoring 진행.
   비용. onload 마다 호출 비용 없음.
 - **두 진입점 일관성**: main.ts + publishVault.ts 둘 다 동일 helper + 동일
   Notice — 사용자가 어디서든 동일 메시지 수신.
-- **자율 진행**: 사용자 부재 + "휴먼 검토 적게" 의무 명시 → 측정
+- **자율 진행**: 사용자 부재 + "휴먼 검토 적게" 의무 명시 (사용자 발화 인용) → 측정
   + fix + release 사이클 전체 수행. 사용자가 *결과 review* 만.

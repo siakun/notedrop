@@ -52,7 +52,7 @@ v0.1.30 시점 의 상황:
 
 ### 3.2 v0.1.32 — publish 명령어 캡슐화 리팩터링
 
-**증상**: v0.1.31 의 fix 가 main.ts 안의 runPublish 에 dirty 체크 + Notice + force 플래그를 박아 monolithic. 사용자 지적 *"main.ts 에 하드코딩 하지 말고 명령어 단위로 분리 캡슐화"*.
+**증상**: v0.1.31 의 fix 가 main.ts 안의 runPublish 에 dirty 체크 + Notice + force 플래그를 함께 추가하여 monolithic 화. 사용자 지적 *"main.ts 에 하드코딩 하지 말고 명령어 단위로 분리 캡슐화"*.
 
 **Fix**: 
 - `commands/publishVault.ts` 의 `executePublish` (private 의도) + `publishVault` (smart entry, gate 통과 시)
@@ -220,9 +220,9 @@ console 출력은 항상 (DevTools 즉시 진단). 파일 append 는 **사용자
 
 10MB rotation: append 만 단순. 매우 큰 vault 의 publish 가 누적되어도 size 한계 자동 관리.
 
-### 4.5 Bootstrap 자산 명시적 제외 (Tree API last-write-wins 회유)
+### 4.5 Bootstrap 자산 명시적 제외 (Tree API last-write-wins 우회책)
 
-GitHub Tree API 의 *같은 path 여러 entry → 마지막 적용* 동작은 문서화 안 됨. 명시적 deduplication 도 안 함. 사용자 publish 가 의도하지 않은 덮어쓰기 가능. 회유:
+GitHub Tree API 의 *같은 path 여러 entry → 마지막 적용* 동작은 문서화 X. 명시적 deduplication 도 미수행. 사용자 publish 가 의도하지 않은 덮어쓰기 가능. 우회책:
 
 - **명시적 제외 list**: `manifest.json`, `content/**` (사용자 publish 가 책임지는 path)
 - 또는 *더 robust*: PlanFactory 가 plan.files 에 path 별 dedup 추가 (마지막 add 만 유지). 단 v2 검토 — 현재 fix 가 핵심 case 해결.

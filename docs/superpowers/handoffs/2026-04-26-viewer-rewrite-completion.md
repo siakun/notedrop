@@ -180,7 +180,7 @@ DocViewer + BookViewer 가 source 를 hidden div 로 hydration 후 paged.js Prev
 
 함정: deploy.yml 의 paths trigger 가 `viewer/**` 인데 publish 가 main 브랜치에 새 manifest commit 하면 viewer/public/manifest.json 변경 → trigger 됨. 단 `viewer/dist/**` 는 제외 (vanilla 잔재 없도록).
 
-근데 publish 가 public 레포의 viewer/public/manifest.json 갱신 (Tree API 의 base_tree). 본 repo (siakun/notedrop) 의 viewer/public/manifest.json 은 부트스트랩 (welcome) 그대로. 즉 본 repo 는 viewer 코드 변경 시만 deploy.yml trigger. publish 후 GH Pages 갱신은 publish 대상 repo 가 자체 deploy.yml 가져야 함 — **본 repo 가 publish 대상이 같으면 자동, 다르면 사용자가 publish 대상 repo 에도 deploy.yml 복사 필요**.
+단 publish 가 public 레포의 viewer/public/manifest.json 갱신 (Tree API 의 base_tree). 본 repo (siakun/notedrop) 의 viewer/public/manifest.json 은 부트스트랩 (welcome) 그대로. 즉 본 repo 는 viewer 코드 변경 시만 deploy.yml trigger. publish 후 GH Pages 갱신은 publish 대상 repo 가 자체 deploy.yml 보유 의무 — **본 repo 가 publish 대상이 같으면 자동, 다르면 사용자가 publish 대상 repo 에도 deploy.yml 복사 필요**.
 
 본 세션 가정: publish 대상 = 본 repo (siakun/notedrop). dogfood 에서 deploy.yml 가 publish 후 자동 trigger 되는지 확인 필요.
 
@@ -233,7 +233,7 @@ dogfood 에서 검증 의무:
 - 사이드바 챕터 클릭 + scrollIntoView
 - 우하단 LIVE 뱃지 status
 
-## 7. 본 세션이 못한 것
+## 7. 본 세션 미수행 항목
 
 - viewer 단위 테스트 0 작성 (vitest 의존만 추가, 실 테스트는 dogfood 후)
 - 옵시디언 GUI 자동화 미가능 (수동 dogfood)

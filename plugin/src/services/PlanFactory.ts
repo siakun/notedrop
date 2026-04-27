@@ -20,7 +20,7 @@ import viewerFingerprintRaw from '../embedded/viewer.fingerprint.txt'
  * `${VIEWER_FINGERPRINT}|${publicRoot}|${repoSegment}` 비교가 동일이면
  * viewer.zip unpack/path-replace 자체 skip + baseline 의 hash 를 cached
  * entry 로 plan.files 에 등록. 변경 감지 filter 가 cached entry 를 push
- * 안 함 (base_tree 보존). 효과: 일반 publish 의 plan 빌드 + DirtyTracker
+ * 대상 제외 (base_tree 보존). 효과: 일반 publish 의 plan 빌드 + DirtyTracker
  * snapshot 에서 viewer 자산의 unpack + 144 file SHA-256 hash 모두 skip.
  */
 export type PlanFactoryOptions = { force?: boolean }

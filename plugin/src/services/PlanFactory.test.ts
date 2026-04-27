@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 // PlanFactory 가 import 시점에 viewer.fingerprint.txt 를 const 로 등록.
-// fresh checkout 또는 빌드 안 한 상태면 빈 문자열이라 cache hit 분기 비활성.
+// fresh checkout 또는 미빌드 상태이면 빈 문자열이라 cache hit 분기 비활성.
 // 테스트는 fixed fingerprint 로 cache 동작 검증.
 vi.mock('../embedded/viewer.fingerprint.txt', () => ({
   default: 'test-fingerprint-12345'
 }))
 
 // viewer.zip.b64 도 fixed (빈) 으로 등록 — 단위 테스트가 빌드 산출물 의존
-// 안 하도록. 빈 zip 시 collectViewerFiles 가 .nojekyll 1개만 반환 (현재
+// 회피. 빈 zip 시 collectViewerFiles 가 .nojekyll 1개만 반환 (현재
 // 동작). cache miss 테스트는 .nojekyll 등록으로 검증.
 vi.mock('../embedded/viewer.zip.b64', () => ({ default: '' }))
 
@@ -186,7 +186,7 @@ describe('createPlanFactory cache 분기', () => {
   it('v0.1.46 옵션 B: fingerprint mismatch + baseline 있음 → cached entry + viewerCacheHit=false', async () => {
     // 옵션 B 의 핵심 케이스 — plugin update 후 일반 publish.
     // baseline 의 viewer 자산을 cached entry 로 등록하지만 viewerCacheHit=false
-    // 라 publishVault 가 Notice "viewer sync 의무" 띄움.
+    // 라 publishVault 가 Notice "viewer sync 의무" 표시.
     settings.lastViewerCacheKey = 'old-fingerprint|...|notedrop-share'
     settings.lastPublishedFiles = {
       '.nojekyll': { hash: 'h-nojekyll', text: '' },
@@ -200,11 +200,11 @@ describe('createPlanFactory cache 분기', () => {
     const plan = await factory()
     expect(plan.viewerCacheHit).toBe(false)
     expect(plan.viewerCacheKey).not.toBe(settings.lastViewerCacheKey)
-    // baseline 의 viewer 자산은 *여전히* cached entry 로 존재 (push 안 됨)
+    // baseline 의 viewer 자산은 *여전히* cached entry 로 존재 (push X)
     const cached = plan.files.filter((f) => f.kind === 'cached')
     expect(cached.length).toBe(2)
     expect(cached.some((f) => f.path === '_next/static/old-chunk.js')).toBe(true)
-    // 새 viewer 자산 unpack 안 함 — collectViewerFiles 호출 0
+    // 새 viewer 자산 unpack 미수행 — collectViewerFiles 호출 0
     expect(plan.files.some((f) => f.kind === 'text' && f.path.endsWith('.nojekyll'))).toBe(false)
   })
 
@@ -232,7 +232,7 @@ describe('createPlanFactory cache 분기', () => {
     // v0.1.46: cache key mismatch 라도 baseline 의 viewer 자산은 cached
     // 존재 (push 없음). publicRoot 변경 시 baseline 의 path 가 새 publicRoot
     // 와 다르면 isViewerAssetPath 의 prefix 가드가 false 분류 → cached
-    // entry 등록 안 함 (sanity 보호).
+    // entry 미등록 (sanity 보호).
     settings.lastViewerCacheKey = buildViewerCacheKey(VIEWER_FINGERPRINT, '', 'notedrop-share')
     settings.lastPublishedFiles = {
       '.nojekyll': { hash: 'h', text: '' }  // 옛 publicRoot=''
@@ -246,7 +246,7 @@ describe('createPlanFactory cache 분기', () => {
     expect(plan.viewerCacheHit).toBe(false)
     expect(plan.viewerCacheKey).toContain('docs')
     // baseline 의 .nojekyll 은 publicRoot='' prefix 라 새 publicRoot='docs'
-    // 와 mismatch → isViewerAssetPath false → cached entry 등록 안 함
+    // 와 mismatch → isViewerAssetPath false → cached entry 미등록
     const cached = plan.files.filter((f) => f.kind === 'cached')
     expect(cached.length).toBe(0)
   })

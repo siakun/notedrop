@@ -55,7 +55,7 @@ summary: 플러그인·뷰어 컴포넌트 분해. 모듈별 책임·의존 관�
 | **BookAssembler** | book entry 파일 → Waypoint > MOC > folder scan 3단 폴백으로 챕터 순서 결정 | VaultFs, MetaCache, PublishIndex |
 | **ManifestBuilder** | PublishIndex → manifest.json 직렬화 | PublishIndex |
 
-설계 핵심: Domain 은 옵시디언 의존을 인터페이스 (VaultFs, MetaCache) 로 격리. 테스트에선 InMemory 구현체로 교체 → 옵시디언 안 켜져도 모든 변환 로직 검증 가능.
+설계 핵심: Domain 은 옵시디언 의존을 인터페이스 (VaultFs, MetaCache) 로 격리. 테스트에서는 InMemory 구현체로 교체 → 옵시디언 미실행 상태에서도 모든 변환 로직 검증 가능.
 
 ### 5.1.2 Infrastructure Layer 모듈
 

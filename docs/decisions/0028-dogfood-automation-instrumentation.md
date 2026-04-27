@@ -81,7 +81,7 @@ plugin 측 instrumentation 도입:
 
 ### C. dogfood 전용 plugin 분리
 긍정: production main 의 코드 없음
-부정: 의존 복잡 (notedrop main + dogfood plugin 같이 install 의무). dogfood 의 가치는 *내부 state 접근* 인데 별도 plugin 은 그게 어려움
+부정: 의존 복잡 (notedrop main + dogfood plugin 같이 install 의무). dogfood 의 가치는 *내부 state 접근* 인데 별도 plugin 으로는 접근 어려움
 
 ## Related
 

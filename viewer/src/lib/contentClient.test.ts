@@ -88,8 +88,8 @@ body`
 
   it('frontmatter 안에 적어도 한 줄 있을 때만 처리 (production 보장 가정)', () => {
     // production 의 ContentTransformer 는 항상 PageFrontmatter 의 11 필드를
-    // 닫혀 있으므로 빈 frontmatter case 는 안 나옴. 본 parser 는 단순 — close
-    // fence 검색 위치가 fence.length 부터라 빈 frontmatter 는 close 못 찾고
+    // 직렬화하므로 빈 frontmatter case 는 발생 X. 본 parser 는 단순 — close
+    // fence 검색 위치가 fence.length 부터라 빈 frontmatter 는 close 미발견 →
     // raw 전체 body 반환. production 영향 없음.
     const raw = '---\nhash: x\n---\n\nbody'
     const { frontmatter, body } = parsePageMarkdown(raw)

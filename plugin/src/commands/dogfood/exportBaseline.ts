@@ -5,7 +5,7 @@ import type { CommandDef } from '../types.js'
 export async function exportBaseline(ctx: PluginContext): Promise<void> {
   const traceId = ctx.eventLogger.newTraceId()
   const files = ctx.settings.lastPublishedFiles ?? {}
-  // 전체 dump (수십 KB 가능). 호출자가 의도해서 등록
+  // 전체 dump (수십 KB 가능). 호출자가 의도적으로 호출
   await ctx.eventLogger.emit('dogfood_export_baseline_completed', {
     digest: ctx.settings.lastPublishedDigest,
     fileCount: Object.keys(files).length,

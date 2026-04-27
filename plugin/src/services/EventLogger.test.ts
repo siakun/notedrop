@@ -53,7 +53,7 @@ describe('EventLogger', () => {
     expect(entry.data.foo).toBe('visible')
   })
 
-  it('동시 emit() 박아도 line 깨짐 0 (직렬화)', async () => {
+  it('동시 emit() 호출 시 line 깨짐 0 (직렬화)', async () => {
     const logger = new EventLogger({ logPath, pluginVersion: '0.1.47' })
     // 50개 동시 emit
     await Promise.all(
@@ -64,7 +64,7 @@ describe('EventLogger', () => {
     const content = await fs.readFile(logPath, 'utf-8')
     const lines = content.trim().split('\n')
     expect(lines).toHaveLength(50)
-    // 각 line 이 valid JSON 등록
+    // 각 line 이 valid JSON 으로 기록
     for (const line of lines) {
       const entry = JSON.parse(line)
       expect(entry.type).toBe('concurrent_test')

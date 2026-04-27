@@ -38,7 +38,7 @@ C. 챕터마다 개별 publish 플래그
 
 책 entry 가 결정되면 챕터 순서를 다음 순으로 결정:
 
-1. **Waypoint 블록**: entry 파일 안 `%% Begin Waypoint %% ... %% End Waypoint %%` 안의 wikilink 순서. Waypoint 플러그인이 알아서 유지.
+1. **Waypoint 블록**: entry 파일 안 `%% Begin Waypoint %% ... %% End Waypoint %%` 안의 wikilink 순서. Waypoint 플러그인이 자동 유지.
 2. **MOC.md**: 같은 폴더의 `MOC.md` 파일이 있으면 그 wikilink 순서 (먼저 발견된 wikilink 부터 챕터 순서 결정)
 3. **폴더 스캔**: 위 둘 다 없으면 폴더의 .md 자연 정렬. `_` 또는 `.` 시작 파일, `CLAUDE.md`, `원본매핑.md`, entry 파일 자체, `MOC.md` 같은 내부 파일은 제외
 
@@ -79,7 +79,7 @@ C. 챕터마다 개별 publish 플래그
 거부 사유:
 - 30챕터짜리 책이면 30번 토글 (UX 부담)
 - 챕터 추가 시마다 잊을 위험
-- 책 단위 설정 (cover, customCss) 어디 둘지 애매
+- 책 단위 설정 (cover, customCss) 위치 결정 모호
 
 ### B 변형: explicit chapters frontmatter
 

@@ -172,7 +172,7 @@ export default class NotedropPlugin extends Plugin {
       })
     }
 
-    // dogfood 명령 — debugMode 시만
+    // dogfood 명령 — debugMode==true 시만 등록
     if (this.settings.debugMode) {
       const { DOGFOOD_COMMAND_REGISTRY } = await import('./commands/dogfood/registry.js')
       for (const cmd of DOGFOOD_COMMAND_REGISTRY) {

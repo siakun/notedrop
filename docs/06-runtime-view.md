@@ -14,7 +14,7 @@ summary: 라이브 미리보기·발행 시퀀스, 변환 파이프라인, 캐�
 
 ## 6.1 두 가지 모드 비교
 
-같은 Domain 파이프라인을 두 트리거가 호출. 다른 건 출력처와 변환 시점.
+같은 Domain 파이프라인을 두 트리거가 호출. 차이는 출력처와 변환 시점.
 
 | 측면 | 라이브 미리보기 | 발행 |
 |---|---|---|
@@ -172,16 +172,16 @@ MVP 정책: 즉시 자동 unpublish. 옵션 토글 (기본 ON) 으로 사용자�
 |---|---|---|
 | 플러그인 메모리 | PublishIndex (Map) | vault 이벤트로 incremental update |
 | 플러그인 메모리 | 자산 vault 위치 인덱스 | `vault.on('rename' \| 'delete')` |
-| 플러그인 메모리 | 변환 결과 (옵션) | MVP 안 함 (변환 비용 낮음) |
+| 플러그인 메모리 | 변환 결과 (옵션) | MVP 미수행 (변환 비용 낮음) |
 | 브라우저 메모리 | manifest.json | SSE `manifest-changed` 신호 시 무효화 |
 | 브라우저 메모리 | /content/<hash> | SSE `content-changed` 신호 시 해당 hash 만 |
 | 브라우저 HTTP 캐시 | 정적 자산 (이미지) | `Cache-Control` 헤더 (단기) |
 | GH Pages CDN | 정적 파일 | 새 deploy 시 자동 (1~5분 지연) |
 
-라이브 모드에서 *캐시 갱신 안 됨* 사고 방지:
-- 변환 결과 캐시는 MVP 에서 안 만듬 (변환이 빠르므로 매번 새로 변환)
+라이브 모드에서 *캐시 미갱신* 사고 방지:
+- 변환 결과 캐시는 MVP 에서 생성하지 않음 (변환이 빠르므로 매번 새로 변환)
 - 자산 위치 인덱스는 rename/delete 이벤트로 즉시 무효화
-- 명령어 "Notedrop: Clear preview cache" 추가 (만일을 위한 수동 리셋)
+- 명령어 "Notedrop: Clear preview cache" 추가 (만일을 대비한 수동 리셋)
 
 ## 6.6 SSE 이벤트 형식
 

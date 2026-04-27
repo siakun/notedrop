@@ -41,7 +41,7 @@ summary: 플러그인은 Hexagonal Architecture, 뷰어 마크다운은 unified.
 
 Domain 이 외부에 요구하는 인터페이스 = **Ports** (VaultFs, MetaCache, GitClient). Adapter 가 Port 의 실제 구현.
 
-테스트에선 Port 를 fake 로 교체 (InMemoryVaultFs, FakeMetaCache, FakeGitClient) → 옵시디언 안 켜져도 Domain 단위 테스트 가능.
+테스트에서는 Port 를 fake 로 교체 (InMemoryVaultFs, FakeMetaCache, FakeGitClient) → 옵시디언 미실행 상태에서도 Domain 단위 테스트 가능.
 
 ### 2. 뷰어 마크다운 = unified.js
 
@@ -78,7 +78,7 @@ markdown 텍스트
 ### Unified
 
 긍정:
-- 새 문법 = plugin 1개 추가, 다른 곳 안 건드림 (몇 곳을 고치는가 = 1)
+- 새 문법 = plugin 1개 추가, 다른 곳 변경 X (몇 곳을 고치는가 = 1)
 - mdast/hast 표준 AST → 다른 도구 (예: MDX) 로 옮길 때 호환
 - 거의 모든 표준 마크다운 확장이 npm 에 plugin 으로 존재 (math, gfm, footnotes 등)
 - 옵시디언 community 에 이미 unified 기반 마크다운 도구 다수 - 참고 자료 풍부

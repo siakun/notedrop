@@ -126,7 +126,7 @@ summary: dogfood 반복 중 사용자가 직접 지시한 UI/UX 사양·명명 �
 ### 13.3.8 Force publish 명령 (v0.1.34)
 
 - **결정**: `Notedrop: Force publish vault to GitHub` 명령 — dirty gate 무시 + diff 무시 전체 push
-- **사유**: dogfood 중 baseline 손상이나 share repo 외부 수정 의심 시 *전부 다시 보내기* 필요. UI 토글 X (위험 액션이라 일반 Publish 와 시각적 분리)
+- **사유**: dogfood 중 baseline 손상이나 share repo 외부 수정 의심 시 *전체 재전송* 필요. UI 토글 X (위험 액션이라 일반 Publish 와 시각적 분리)
 - **위치**: `plugin/src/commands/forcePublishVault.ts`
 
 ### 13.3.9 Reset publish baseline 명령 (v0.1.36)
@@ -338,7 +338,7 @@ PDF Expert 의 View Settings popover 상단 카드 3개 (Vertical Scroll / Horiz
 | Two Pages | **가상** (transform) | 2 페이지 동시 표시 (서적 펼침) | "책 펼침" |
 
 - **활성 카드 시각**: 1.5px `var(--color-accent)` border, 본문 텍스트 `accent-hover` 색, 8% 알파 accent 배경
-- **사유**: PDF Expert 의 View Settings 가 가장 익숙한 4 모드 메탈모델. Default 추가는 dogfood 시 일반 마크다운 reading 도 필요 (페이지 개념 없는 노트)
+- **사유**: PDF Expert 의 View Settings 가 가장 익숙한 4 모드 멘탈 모델. Default 추가는 dogfood 시 일반 마크다운 reading 도 필요 (페이지 개념 없는 노트)
 - **위치**: viewer 의 layout 별 React 컴포넌트
 
 ### 13.5.4 페이지 크기 4종 (책 모드 한정, JIS B 시리즈)

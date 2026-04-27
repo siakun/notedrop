@@ -68,7 +68,7 @@ type ManifestItem = {
 
 **필드 10 개**. summary, tags, publishedAt, customCss, filePath 모두 의도적 제외:
 
-- `summary` / `tags`: 카탈로그 뷰에서 안 씀 (사용자 결정 - title + cover 만으로 충분)
+- `summary` / `tags`: 카탈로그 뷰에서 미사용 (사용자 결정 - title + cover 만으로 충분)
 - `publishedAt`: 정렬은 updatedAt 으로 충분
 - `customCss`: 페이지 렌더 시점에만 필요. per-page md frontmatter 로 이동
 - `filePath`: vault 내부 경로. public 노출 위험 방지
@@ -220,9 +220,9 @@ GH Pages 가 viewer/ 의 정적 파일을 서빙 + content/, manifest.json 도 �
 |---|---|
 | `notedrop-publish` | "Share" / "Unshare" 명령어 시 토글만 |
 
-→ 다른 키 (사용자의 mood, summary, source, custom 등) 는 절대 안 건드림.
+→ 다른 키 (사용자의 mood, summary, source, custom 등) 는 변경하지 않음.
 
-→ title, summary, tags 는 읽지도 않고 쓰지도 않음. title 은 파일명에서 derive, summary·tags 는 미사용.
+→ title, summary, tags 는 읽지도 쓰지도 않음. title 은 파일명에서 derive, summary·tags 는 미사용.
 
 ## 7.7 버전 관리
 

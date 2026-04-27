@@ -38,7 +38,7 @@ summary: frontmatter 키는 모두 `notedrop-` prefix 강제. 다른 플러그�
 플러그인이 쓰는 키:
 - `notedrop-publish` 만 (Share/Unshare 토글 시)
 
-다른 키 (사용자의 mood, custom 등) 는 절대 안 건드림.
+다른 키 (사용자의 mood, custom 등) 는 변경하지 않음.
 
 키 이름 규칙:
 - 사용자 의도 표현 (`publish`, `cover`, `slug`)
@@ -77,12 +77,12 @@ notedrop:
 
 거부 사유:
 - 다른 플러그인 충돌 (Pretty Slug 가 `slug` 사용 등)
-- 사용자가 `publish: true` 적었을 때 그게 우리 거인지 다른 거인지 헷갈림
+- 사용자가 `publish: true` 를 적었을 때 본 플러그인 키인지 타 플러그인 키인지 식별 모호
 
 ### 3. 짧은 prefix (`nd-publish`)
 
 거부 사유:
-- 의미 불명 (사용자가 `nd-` 가 뭔지 모름)
+- 의미 불명 (사용자가 `nd-` 의 의미를 알기 어려움)
 - 충돌 가능성 더 높음 (3자라 다른 플러그인이 같은 prefix 쓸 가능성)
 
 ### 4. 키에 구현 디테일 포함 (`notedrop-realtime-share`)

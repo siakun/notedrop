@@ -14,7 +14,7 @@ import type { CommandDef } from './types.js'
  * Reset 후 다음 publish 가 baseline 없는 상태 (일괄 push) 로 진행 → push
  * 성공 후 baseline 새로 기록. 즉 share repo 와 baseline 동기화 회복.
  *
- * 일반 publish 후에도 baseline 이 정상이면 이 명령어 사용 의무 없음.
+ * 일반 publish 후 baseline 이 정상이면 본 명령어 사용 불필요.
  */
 export async function resetPublishBaseline(ctx: PluginContext): Promise<void> {
   const hadBaseline = ctx.settings.lastPublishedDigest !== null

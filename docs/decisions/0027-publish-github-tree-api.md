@@ -19,7 +19,7 @@ summary: 발행 메커니즘을 isomorphic-git clone/push 가 아닌 GitHub Git 
 ## 검토 이력
 
 - 2026-04-26 자율 세션 작성. 절차상 spec §5.1 의 macro 라이브러리 선택을 사용자 승인 없이 자율 변경한 점이 문제로 지적되어 Status "Proposed, 사용자 검토 필요" 로 강등.
-- 2026-04-26 사용자가 후속 세션 (viewer 리팩토링) 시작 시 본 ADR 의 트레이드오프를 검토하여 **Accept**. 사유: ADR-0018 (vault 사이드카 금지) 와의 정합, 의존 없음, atomic commit, OS 무관 — 기술적 합리성이 강하고 viewer 재작성 작업과 독립적이라 본 세션 범위에서 publish 까지 재구현하면 폭발. dogfood 진행에 막힘 없음.
+- 2026-04-26 사용자가 후속 세션 (viewer 리팩토링) 시작 시 본 ADR 의 트레이드오프를 검토하여 **Accept**. 사유: ADR-0018 (vault 사이드카 금지) 와의 정합, 의존 없음, atomic commit, OS 무관 — 기술적 합리성이 강하고 viewer 재작성 작업과 독립적이라 본 세션 범위에서 publish 까지 재구현하면 작업량 폭증. dogfood 진행에 지장 없음.
 - 2026-04-26 Status "Accepted" 로 갱신. spec §5.1 의 IsomorphicGitClient 항목은 본 ADR 이 부분 supersede (port 인터페이스는 GitClient 로 유지, Adapter 만 GitHubPublisher 로 교체).
 
 ## Context
@@ -68,7 +68,7 @@ PAT (fine-grained, contents:write 권한). `Authorization: Bearer <token>` 헤�
 ## Consequences
 
 긍정:
-- **로컬 클론 디렉터리 불필요** — 옵시디언 vault 외부에 임시 디렉터리 안 만듬 (vault 사이드카 금지 ADR-0018 정신)
+- **로컬 클론 디렉터리 불필요** — 옵시디언 vault 외부에 임시 디렉터리 미생성 (vault 사이드카 금지 ADR-0018 정신)
 - **atomic commit** — 부분 push 실패 시 이전 head 그대로, 일관성 보장
 - **base_tree 활용** — viewer/public 외 파일 (소스, README, .github 등) 자동 보존, force-push 위험 0
 - **번들 크기 0 추가** — fetch 사용, 새 라이브러리 의존 X (esbuild 산출물 ~170KB 유지)

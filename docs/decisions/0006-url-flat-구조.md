@@ -6,7 +6,7 @@ tags:
   - ai-generated
   - notedrop
   - adr
-summary: URL은 `/<projname>/<hash>` 평면. 책·문서 prefix 분리 X. 표준 규약 없으니 단순한 게 이김
+summary: URL은 `/<projname>/<hash>` 평면. 책·문서 prefix 분리 X. 표준 규약 없으므로 단순함을 우선
 ---
 # ADR-0006: URL 구조 = `/<projname>/<hash>` 평면
 
@@ -66,7 +66,7 @@ https://siakun.github.io/<projname>/<hash-or-slug>
 
 거부 사유:
 - 폴더 구조 노출 (private 정보 누설 가능)
-- 한국어 폴더명이 URL percent-encode 되어 보기 안 좋음
+- 한국어 폴더명이 URL percent-encode 되어 가독성 저하
 - vault rename 시 URL 깨짐
 
 ### D. Notion 형 짧은 hash 만 (slug 없음)

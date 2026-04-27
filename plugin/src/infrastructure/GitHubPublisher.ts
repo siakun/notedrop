@@ -131,8 +131,8 @@ export class GitHubPublisher {
 
   private async createBlob(file: PublishedFile): Promise<string> {
     if (file.kind === 'cached') {
-      // PlanFactory v0.1.45: cached entry 는 base_tree 보존 의도라 push 안
-      // 대상. publishVault 가 변경 감지 filter + 안전 가드로 차단해야 함.
+      // PlanFactory v0.1.45: cached entry 는 base_tree 보존 의도라 push 대상
+      // 아님. publishVault 가 변경 감지 filter + 안전 가드로 차단해야 함.
       // 여기 도달 시 호출 측 버그 — 명시 throw.
       throw new Error(
         `GitHubPublisher: cached entry "${file.path}" 가 push 대상에 도달 — ` +

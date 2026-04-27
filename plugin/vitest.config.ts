@@ -16,7 +16,7 @@ const embeddedTextLoader = {
       try {
         content = fs.readFileSync(id, 'utf-8')
       } catch {
-        // 파일 없으면 빈 문자열 — fresh checkout (빌드 안 한 상태) 에도 OK
+        // 파일 없으면 빈 문자열 — fresh checkout (미빌드 상태) 에도 OK
       }
       return `export default ${JSON.stringify(content)}`
     }

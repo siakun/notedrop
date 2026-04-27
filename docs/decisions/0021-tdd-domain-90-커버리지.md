@@ -64,7 +64,7 @@ summary: TDD 채택. Domain layer 90%+ 커버리지, 안전장치 100% 커버리
 Unit (Domain layer 전부, fake로 Port 주입)   ← 75%
 ```
 
-대부분 unit 테스트로 검증. Domain layer 가 옵시디언 의존 없이 짜여 있어 (Hexagonal) CI 에서 옵시디언 안 켜고 돌아감.
+대부분 unit 테스트로 검증. Domain layer 가 옵시디언 의존 없이 작성됐기에 (Hexagonal) CI 에서 옵시디언 미실행 상태로 동작.
 
 ### 안전장치 테스트 (필수, 100%)
 
@@ -99,7 +99,7 @@ Unit (Domain layer 전부, fake로 Port 주입)   ← 75%
 ### 1. 테스트 후 작성 (구현 → 테스트)
 
 거부 사유:
-- "테스트 다음에 짠다" 가 실제로는 안 짜지는 경향
+- "테스트 다음에 작성한다" 가 실제로는 미작성되는 경향
 - 안전장치 같은 critical 로직은 테스트 우선이 안전
 
 ### 2. 통합 테스트 위주 (E2E 많이)

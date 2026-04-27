@@ -135,7 +135,7 @@ force publish 또는 plugin update 후 첫 publish 시 *144 file blob 등록* +
 사용자가 plugin update 후 명시 trigger.
 
 `publishVault` 가 *fingerprint mismatch 감지* 시 Notice "viewer 자산 갱신
-의무 — Sync viewer assets 명령 실행" 띄움 (회유, 사용자 인지).
+의무 — Sync viewer assets 명령 실행" 띄움 (우회책, 사용자 인지).
 
 ### 4.2 옵션 A 유지 사유
 
@@ -234,7 +234,7 @@ source 변경 0 인 plugin update 시 cache hit → push 없음. viewer source �
 
 즉 옵션 A 의 *실제 가치* = "사용자가 *plan 빌드 시점 시간* 을 비효율로
 인식" 한 경우만. 사용자 prompt §2 의 *본질적 의도* 는 *push 시점 68초* 였을
-가능성 — 옵션 B 가 그것의 정확한 회유.
+가능성 — 옵션 B 가 그것의 정확한 우회책.
 
 ### 6.4 명령어 분리 = UX 명확화
 

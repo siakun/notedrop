@@ -35,7 +35,7 @@ summary: 테스트 피라미드, Unit·Integration·E2E 전략, 도구, 커버�
 
 ## 10.2 Unit (Domain Layer)
 
-옵시디언 안 켜져도 CI 에서 작동. fake Port 로 모든 Domain 모듈 단위 테스트.
+옵시디언 미실행 상태에서도 CI 에서 작동. fake Port 로 모든 Domain 모듈 단위 테스트.
 
 ### 모듈별 핵심 시나리오
 

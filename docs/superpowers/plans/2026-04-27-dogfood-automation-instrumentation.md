@@ -513,7 +513,7 @@ export const DOGFOOD_COMMAND_REGISTRY: readonly CommandDef[] = [
       })
     }
 
-    // dogfood 명령 — debugMode 시만
+    // dogfood 명령 — debugMode==true 시만 등록
     if (this.settings.debugMode) {
       const { DOGFOOD_COMMAND_REGISTRY } = await import('./commands/dogfood/registry.js')
       for (const cmd of DOGFOOD_COMMAND_REGISTRY) {
@@ -762,7 +762,7 @@ import type { CommandDef } from '../types.js'
 export async function exportBaseline(ctx: PluginContext): Promise<void> {
   const traceId = ctx.eventLogger.newTraceId()
   const files = ctx.settings.lastPublishedFiles ?? {}
-  // 전체 dump (수십 KB 가능). 호출자가 의도해서 등록
+  // 전체 dump (수십 KB 가능). 호출자가 의도적으로 호출
   await ctx.eventLogger.emit('dogfood_export_baseline_completed', {
     digest: ctx.settings.lastPublishedDigest,
     fileCount: Object.keys(files).length,
@@ -1018,7 +1018,7 @@ git commit -m "🚧 feat(plugin): dogfood cleanup-stale-buildid stub 작성 — 
 
 - [ ] **Step 10.1: Logger appendToFile race fix**
 
-`plugin/src/services/Logger.ts:62-79` 의 `write()` 변경 — `appendToFile` 의 promise 이후 `pendingWrites` 박아 onunload 시 await:
+`plugin/src/services/Logger.ts:62-79` 의 `write()` 변경 — `appendToFile` 의 promise 를 `pendingWrites` 에 추가해 onunload 시 await:
 
 ```typescript
 export class FileLogger implements Logger {

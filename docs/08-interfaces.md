@@ -307,7 +307,7 @@ class VaultEventBridge {
 |---|---|
 | `notedrop-publish` | "Share" / "Unshare" 명령어 시 토글 |
 
-→ title, summary, tags 모두 안 읽고 안 씀. 다른 키도 절대 안 건드림.
+→ title, summary, tags 모두 읽지도 쓰지도 않음. 다른 키도 변경하지 않음.
 
 ## 8.5 인터페이스 안정성 등급
 
@@ -344,4 +344,4 @@ test('미발행 노트 위키링크는 빨간 dead link 로 변환된다', async
 })
 ```
 
-옵시디언 안 켜져도 모든 변환 로직 검증 가능 → CI 친화.
+옵시디언 미실행 상태에서도 모든 변환 로직 검증 가능 → CI 친화.
