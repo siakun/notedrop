@@ -15,6 +15,16 @@
  * 단위 테스트는 fake.
  */
 
+import {
+  materializeLineRange,
+  prepareWithSegments,
+  walkLineRanges,
+  type WordBreakMode
+} from '@chenglou/pretext'
+
+/** pretext 의 WhiteSpaceMode (analysis.d.ts) — layout entry 에서 re-export 안 됨 */
+type PretextWhiteSpace = 'normal' | 'pre-wrap'
+
 export type FontStyle = {
   fontFamily: string
   fontSize: number  // px
@@ -146,4 +156,75 @@ export function splitElementAtCharIndex(
   }
   tail.appendChild(fragment)
   return tail
+}
+
+/**
+ * 줄별 lineText 배열을 원본 text 안의 char range 배열로 매핑. pretext 가 정규화한
+ * lineText (multi-space → single-space 등) 가 indexOf 로 못 찾히면 positional 추정
+ * (pos + lineText.length 누적) 로 fallback — 화면 깨짐보다 약간 부정확한 split
+ * boundary 가 낫다.
+ */
+export function mapLineTextsToRanges(text: string, lineTexts: string[]): LineRange[] {
+  const lines: LineRange[] = []
+  let pos = 0
+  for (const lt of lineTexts) {
+    if (lt.length === 0) continue
+    const startIdx = text.indexOf(lt, pos)
+    if (startIdx < 0) {
+      const endIdx = Math.min(pos + lt.length, text.length)
+      lines.push({ startIdx: pos, endIdx })
+      pos = endIdx
+      continue
+    }
+    const endIdx = startIdx + lt.length
+    lines.push({ startIdx, endIdx })
+    pos = endIdx
+  }
+  return lines
+}
+
+/** FontStyle → CSS font shorthand. pretext 가 받는 형식. */
+function buildFontShorthand(style: FontStyle): string {
+  const sizePart = `${style.fontSize}px`
+  const familyPart = style.fontFamily || 'sans-serif'
+  const parts: string[] = []
+  if (style.fontStyle && style.fontStyle !== 'normal') parts.push(style.fontStyle)
+  if (style.fontWeight && style.fontWeight !== 'normal' && style.fontWeight !== '400') {
+    parts.push(style.fontWeight)
+  }
+  parts.push(sizePart)
+  parts.push(familyPart)
+  return parts.join(' ')
+}
+
+/** CSS white-space → pretext WhiteSpaceMode (지원 외 값은 normal) */
+function toPretextWhiteSpace(ws: string): PretextWhiteSpace {
+  return ws === 'pre-wrap' ? 'pre-wrap' : 'normal'
+}
+
+/** CSS word-break → pretext WordBreakMode (지원 외 값은 normal) */
+function toPretextWordBreak(wb: string): WordBreakMode {
+  return wb === 'keep-all' ? 'keep-all' : 'normal'
+}
+
+/**
+ * pretext 호출의 단일 진입점. 다른 함수는 LineRangeMeasurer 인터페이스만 사용
+ * — 이 어댑터를 fake 로 교체 가능. canvas 부재 환경 (jsdom) 에서 실행 시
+ * 호출자가 try/catch 로 fallback.
+ */
+export function createPretextMeasurer(): LineRangeMeasurer {
+  return (text, style, widthPx) => {
+    const font = buildFontShorthand(style)
+    const prepared = prepareWithSegments(text, font, {
+      whiteSpace: toPretextWhiteSpace(style.whiteSpace),
+      wordBreak: toPretextWordBreak(style.wordBreak),
+      letterSpacing: style.letterSpacing
+    })
+    const lineTexts: string[] = []
+    walkLineRanges(prepared, widthPx, (line) => {
+      lineTexts.push(materializeLineRange(prepared, line).text)
+    })
+    const lines = mapLineTextsToRanges(text, lineTexts)
+    return { lineHeight: style.lineHeight, lines }
+  }
 }

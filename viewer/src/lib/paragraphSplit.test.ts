@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   isSplittableElement,
+  mapLineTextsToRanges,
   pickSplitLine,
   splitElementAtCharIndex
 } from './paragraphSplit'
@@ -141,5 +142,36 @@ describe('splitElementAtCharIndex', () => {
   it('빈 element → null', () => {
     const p = document.createElement('p')
     expect(splitElementAtCharIndex(p, 1)).toBeNull()
+  })
+})
+
+describe('mapLineTextsToRanges', () => {
+  it('lineTexts 가 원본의 정확한 substring 이면 char range 매핑', () => {
+    const text = 'Hello World Foo Bar'
+    const lineTexts = ['Hello World', 'Foo Bar']
+    expect(mapLineTextsToRanges(text, lineTexts)).toEqual([
+      { startIdx: 0, endIdx: 11 },
+      { startIdx: 12, endIdx: 19 }
+    ])
+  })
+
+  it('lineText 가 정규화돼서 indexOf 실패 시 positional fallback', () => {
+    const text = 'foo  bar'  // 2 spaces
+    const lineTexts = ['foo bar']  // 1 space (정규화)
+    const result = mapLineTextsToRanges(text, lineTexts)
+    expect(result).toEqual([{ startIdx: 0, endIdx: 7 }])
+  })
+
+  it('빈 lineText 는 skip', () => {
+    const text = 'foo bar'
+    const lineTexts = ['foo', '', 'bar']
+    expect(mapLineTextsToRanges(text, lineTexts)).toEqual([
+      { startIdx: 0, endIdx: 3 },
+      { startIdx: 4, endIdx: 7 }
+    ])
+  })
+
+  it('빈 lineTexts → 빈 결과', () => {
+    expect(mapLineTextsToRanges('foo', [])).toEqual([])
   })
 })
