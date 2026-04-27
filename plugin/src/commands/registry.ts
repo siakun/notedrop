@@ -5,7 +5,6 @@ import { copyShareUrlCommand } from './copyShareUrl.js'
 import { publishVaultCommand } from './publishVault.js'
 import { forcePublishVaultCommand } from './forcePublishVault.js'
 import { syncViewerAssetsCommand } from './syncViewerAssets.js'
-import { resetPublishBaselineCommand } from './resetPublishBaseline.js'
 import {
   openPreviewCommand,
   startPreviewCommand,
@@ -23,7 +22,6 @@ export const COMMAND_REGISTRY: readonly CommandDef[] = [
   publishVaultCommand,
   forcePublishVaultCommand,
   syncViewerAssetsCommand,
-  resetPublishBaselineCommand,
   startPreviewCommand,
   stopPreviewCommand,
   openPreviewCommand,

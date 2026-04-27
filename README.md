@@ -102,7 +102,6 @@
 | `Notedrop: Copy share URL` | `<auto-derived-pages-url>/#/<hash 또는 slug>/` 클립보드 복사 |
 | `Notedrop: Publish vault to GitHub` | 변환 → Tree API atomic commit. dirty 없으면 noop (Settings 의 Publish 버튼과 동일) |
 | `Notedrop: Force publish vault to GitHub` | dirty gate 무시하고 강제 전체 push (escape hatch) |
-| `Notedrop: Reset publish baseline` | `lastPublishedDigest`/`lastPublishedFiles` 초기화. 다음 publish 가 모든 파일을 새 baseline 으로 push (share repo 가 외부에서 수정됐을 때) |
 | `Notedrop: Show publish diff` | 다음 publish 가 보낼 파일 목록과 라인 단위 diff modal (GitHub Desktop 류 split view) |
 | `Notedrop: Start/Stop preview server` | 로컬 http://127.0.0.1:4321 서버 (SSE 라이브 리로드) |
 | `Notedrop: Open preview in browser` | 시작 + 브라우저 자동 오픈 |

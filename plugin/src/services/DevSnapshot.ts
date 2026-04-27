@@ -1,6 +1,5 @@
 import type { PluginSettings } from '../settings/PluginSettings.js'
-
-const SECRET_KEYS = ['githubPat']
+import { redactRecordSecrets } from './SecretMasking.js'
 
 export type DevSnapshot = {
   settings: Omit<PluginSettings, 'lastPublishedFiles'> & {
@@ -21,13 +20,7 @@ export type DevSnapshotInput = {
 
 export function buildDevSnapshot(input: DevSnapshotInput): DevSnapshot {
   const { settings } = input
-  const masked = { ...settings } as Record<string, unknown>
-  for (const k of SECRET_KEYS) {
-    const v = masked[k]
-    if (typeof v === 'string' && v.length > 0) {
-      masked[k] = v.length <= 8 ? '***' : `${v.slice(0, 4)}***${v.slice(-2)}`
-    }
-  }
+  const masked = redactRecordSecrets({ ...settings } as Record<string, unknown>)
   // lastPublishedFiles 전체 노출은 위험 (수십~수백 KB) → count 만
   const baselineFileCount = settings.lastPublishedFiles
     ? Object.keys(settings.lastPublishedFiles).length : 0

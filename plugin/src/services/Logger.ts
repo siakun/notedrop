@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { App, FileSystemAdapter } from 'obsidian'
+import { redactSecrets as sharedRedactSecrets } from './SecretMasking.js'
 
 /**
  * 진단 로거. 항상 console 출력 + debug mode 일 때만 파일 append.
@@ -165,13 +166,7 @@ export class ConsoleLogger implements Logger {
  * 새어나가지 않도록.
  */
 function redactSecrets(key: string, value: unknown): unknown {
-  const secretKeys = ['githubPat', 'token', 'pat', 'authorization', 'auth']
-  if (secretKeys.includes(key.toLowerCase()) && typeof value === 'string') {
-    if (value.length === 0) return ''
-    if (value.length <= 8) return '***'
-    return `${value.slice(0, 4)}***${value.slice(-2)}`
-  }
-  return value
+  return sharedRedactSecrets(key, value)
 }
 
 function indent(text: string, spaces: number): string {

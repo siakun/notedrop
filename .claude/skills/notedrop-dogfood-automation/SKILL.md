@@ -90,6 +90,7 @@ for i in $(seq 1 60); do
   sleep 1
   TAIL=$(obsidian eval code="(async()=>{const t=await app.vault.adapter.read('$EVENTS_PATH');return t.slice(-2000)})()" 2>&1 | tail -1)
   echo "$TAIL" | grep -q "dogfood_publish_completed" && break
+  echo "$TAIL" | grep -q "dogfood_publish_skipped" && break
   echo "$TAIL" | grep -q "dogfood_publish_failed" && break
 done
 
@@ -157,8 +158,8 @@ obsidian-cli 범위 밖. 의무 의무:
 | `notedrop:dogfood:reset-baseline` | 모든 baseline 필드 null | `dogfood_reset_baseline_completed` |
 | `notedrop:dogfood:export-baseline` | baseline file mapping | `dogfood_export_baseline_completed` |
 | `notedrop:dogfood:dump-log-tail` | notedrop.log tail (100줄) | `dogfood_dump_log_tail_{completed,failed}` |
-| `notedrop:dogfood:trigger-publish-smart` | smart publish + trace | `dogfood_publish_{started,completed,failed}` |
-| `notedrop:dogfood:trigger-publish-force` | force publish + trace | `dogfood_publish_{started,completed,failed}` |
+| `notedrop:dogfood:trigger-publish-smart` | smart publish + trace | `dogfood_publish_{started,completed,skipped,failed}` |
+| `notedrop:dogfood:trigger-publish-force` | force publish + trace | `dogfood_publish_{started,completed,skipped,failed}` |
 | `notedrop:dogfood:cleanup-stale-buildid` | (stub) | `dogfood_cleanup_skipped` |
 
 ## 한계 (해결 0, 우회책 등록)

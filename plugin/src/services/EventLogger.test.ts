@@ -19,7 +19,7 @@ describe('EventLogger', () => {
     const content = await fs.readFile(logPath, 'utf-8')
     const lines = content.trim().split('\n')
     expect(lines).toHaveLength(1)
-    const entry = JSON.parse(lines[0])
+    const entry = JSON.parse(lines[0]!)
     expect(entry).toMatchObject({
       type: 'test_event',
       version: '0.1.47',
@@ -77,7 +77,19 @@ describe('EventLogger', () => {
     const logger = new EventLogger({ logPath: '', pluginVersion: '0.1.47' })
     await logger.emit('test', { foo: 'bar' })
     expect(warnSpy).toHaveBeenCalledTimes(1)
-    expect(warnSpy.mock.calls[0][0]).toContain('logPath empty')
+    expect(warnSpy.mock.calls[0]![0]).toContain('logPath empty')
     warnSpy.mockRestore()
+  })
+
+  it('emit() is a no-op when isEnabled returns false', async () => {
+    const logger = new EventLogger({
+      logPath,
+      pluginVersion: '0.1.47',
+      isEnabled: () => false
+    })
+
+    await logger.emit('debug_only_event', { foo: 'bar' })
+
+    await expect(fs.stat(logPath)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 })

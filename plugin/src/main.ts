@@ -73,7 +73,8 @@ export default class NotedropPlugin extends Plugin {
       : ''
     const eventLogger = new EventLogger({
       logPath: eventLogPath,
-      pluginVersion: PLUGIN_VERSION
+      pluginVersion: PLUGIN_VERSION,
+      isEnabled: () => this.settings.debugMode
     })
 
     const preview = new PreviewServer(orchestrator, vault, index, {
