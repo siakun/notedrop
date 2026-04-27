@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { splitByLineHeight } from './lineStream'
-import type { Line } from './lineStream'
+import { buildLineStream, splitByLineHeight } from './lineStream'
+import type { Line, LineRangeMeasurer } from './lineStream'
 
 function L(opts: Partial<Line>): Line {
   return {
@@ -94,5 +94,119 @@ describe('splitByLineHeight', () => {
     const groups = splitByLineHeight([first, heading], 100)
     expect(groups.length).toBe(1)
     expect(groups[0]!.length).toBe(2)
+  })
+})
+
+function fakeMeasurer(perLineChars: number, lineHeight: number): LineRangeMeasurer {
+  return (text) => {
+    const lines = []
+    for (let i = 0; i < text.length; i += perLineChars) {
+      lines.push({ startIdx: i, endIdx: Math.min(i + perLineChars, text.length) })
+    }
+    return { lineHeight, lines }
+  }
+}
+
+function setupParent(htmlList: string[]): HTMLElement {
+  const parent = document.createElement('section')
+  for (const html of htmlList) {
+    parent.insertAdjacentHTML('beforeend', html)
+  }
+  document.body.appendChild(parent)
+  return parent
+}
+
+describe('buildLineStream', () => {
+  it('<p> 분할 — measurer 결과 N line', () => {
+    const parent = setupParent(['<p>ABCDEFGHIJ</p>'])  // 10 chars
+    const p = parent.firstElementChild as HTMLElement
+    // jsdom 의 offsetHeight = 0 → short-paragraph gate 통과 — measure skip.
+    // 강제로 offsetHeight 설정해 measure trigger.
+    Object.defineProperty(p, 'offsetHeight', { value: 200, configurable: true })
+    const m = fakeMeasurer(2, 20)
+    const lines = buildLineStream([p], { innerWidthPx: 500, innerHeightPx: 100 }, m)
+    expect(lines.length).toBe(5)
+    expect(lines[0]!.charStart).toBe(0)
+    expect(lines[0]!.charEnd).toBe(2)
+    expect(lines[0]!.kind).toBe('paragraph')
+    expect(lines[0]!.height).toBe(20)
+    expect(lines[0]!.splittable).toBe(true)
+    document.body.removeChild(parent)
+  })
+
+  it('heading 은 line 1 개 + breakAfterAvoid', () => {
+    const parent = setupParent(['<h2>제목</h2>'])
+    const h = parent.firstElementChild as HTMLElement
+    const m = fakeMeasurer(2, 20)
+    const lines = buildLineStream([h], { innerWidthPx: 500, innerHeightPx: 100 }, m)
+    expect(lines.length).toBe(1)
+    expect(lines[0]!.kind).toBe('heading')
+    expect(lines[0]!.breakAfterAvoid).toBe(true)
+    expect(lines[0]!.splittable).toBe(false)
+    document.body.removeChild(parent)
+  })
+
+  it('unit element (pre/table/img) 는 line 1 개', () => {
+    const parent = setupParent([
+      '<pre>code</pre>',
+      '<table><tr><td>x</td></tr></table>',
+      '<img src="x">'
+    ])
+    const els = Array.from(parent.children) as HTMLElement[]
+    const m = fakeMeasurer(2, 20)
+    const lines = buildLineStream(els, { innerWidthPx: 500, innerHeightPx: 100 }, m)
+    expect(lines.length).toBe(3)
+    for (const l of lines) {
+      expect(l.kind).toBe('unit')
+      expect(l.splittable).toBe(false)
+    }
+    document.body.removeChild(parent)
+  })
+
+  it('<ul> 컨테이너 → 자식 <li> 들이 line 으로', () => {
+    const parent = setupParent(['<ul><li>A</li><li>B</li></ul>'])
+    const ul = parent.firstElementChild as HTMLElement
+    const m = fakeMeasurer(2, 20)
+    const lines = buildLineStream([ul], { innerWidthPx: 500, innerHeightPx: 100 }, m)
+    expect(lines.length).toBeGreaterThanOrEqual(2)
+    expect(lines[0]!.kind).toBe('list-item')
+    document.body.removeChild(parent)
+  })
+
+  it('짧은 <p> (offsetHeight 0 in jsdom) → measurer skip, line 1개', () => {
+    const parent = setupParent(['<p>x</p>'])
+    const p = parent.firstElementChild as HTMLElement
+    let measureCallCount = 0
+    const m: LineRangeMeasurer = (text, style, w) => {
+      measureCallCount++
+      return fakeMeasurer(2, 20)(text, style, w)
+    }
+    const lines = buildLineStream([p], { innerWidthPx: 500, innerHeightPx: 100 }, m)
+    expect(measureCallCount).toBe(0)
+    expect(lines.length).toBe(1)
+    expect(lines[0]!.splittable).toBe(false)
+    document.body.removeChild(parent)
+  })
+
+  it('measurer throw 시 element 단위 line 1 개 fallback', () => {
+    const parent = setupParent(['<p>긴 단락 ' + 'x'.repeat(500) + '</p>'])
+    const p = parent.firstElementChild as HTMLElement
+    Object.defineProperty(p, 'offsetHeight', { value: 1000, configurable: true })
+    const failing: LineRangeMeasurer = () => {
+      throw new Error('canvas unavailable')
+    }
+    const lines = buildLineStream([p], { innerWidthPx: 500, innerHeightPx: 100 }, failing)
+    expect(lines.length).toBe(1)
+    expect(lines[0]!.splittable).toBe(false)
+    document.body.removeChild(parent)
+  })
+
+  it('빈 <p> (텍스트 없음) — line 1 개', () => {
+    const parent = setupParent(['<p></p>'])
+    const p = parent.firstElementChild as HTMLElement
+    const m = fakeMeasurer(2, 20)
+    const lines = buildLineStream([p], { innerWidthPx: 500, innerHeightPx: 100 }, m)
+    expect(lines.length).toBe(1)
+    document.body.removeChild(parent)
   })
 })

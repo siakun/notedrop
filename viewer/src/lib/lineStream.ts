@@ -102,6 +102,126 @@ export { splitElementAtCharIndex }
 export type { FontStyle, LineRangeMeasurer }
 
 /**
+ * element[] → Line[]. element 종류별 분류 + line 발생.
+ *
+ * - paragraph (<p>): measurer 호출 → N line. 짧은 단락 (offsetHeight ≤
+ *   lineHeight × SHORT_PARAGRAPH_RATIO) 은 measure skip → 1 line.
+ * - heading: 1 line + breakAfterAvoid: true.
+ * - unit (table/pre/img/blockquote/callout/hr/figure/svg): 1 line.
+ * - list (ul/ol): 자식 li 재귀.
+ * - 빈 element: 1 line.
+ *
+ * measurer throw 시 element 단위 1 line fallback (canvas 부재 환경 호환).
+ */
+export function buildLineStream(
+  children: HTMLElement[],
+  metrics: LineStreamMetrics,
+  measurer: LineRangeMeasurer
+): Line[] {
+  const out: Line[] = []
+  for (const child of children) {
+    if (isListContainer(child)) {
+      const liChildren = Array.from(child.children) as HTMLElement[]
+      out.push(...buildLineStream(liChildren, metrics, measurer))
+      continue
+    }
+    if (isHeading(child)) {
+      out.push({
+        source: child,
+        charStart: -1,
+        charEnd: -1,
+        height: child.offsetHeight,
+        splittable: false,
+        breakAfterAvoid: true,
+        kind: 'heading'
+      })
+      continue
+    }
+    if (isUnitElement(child)) {
+      out.push({
+        source: child,
+        charStart: -1,
+        charEnd: -1,
+        height: child.offsetHeight,
+        splittable: false,
+        breakAfterAvoid: false,
+        kind: 'unit'
+      })
+      continue
+    }
+    if (isInlineSplittable(child)) {
+      const text = child.textContent ?? ''
+      const isLi = child.tagName.toLowerCase() === 'li'
+      const baseKind: LineKind = isLi ? 'list-item' : 'paragraph'
+      if (text.length === 0) {
+        out.push({
+          source: child,
+          charStart: -1,
+          charEnd: -1,
+          height: child.offsetHeight,
+          splittable: false,
+          breakAfterAvoid: false,
+          kind: baseKind
+        })
+        continue
+      }
+      const style = readFontStyle(child)
+      // 짧은 단락 — measure skip
+      if (child.offsetHeight <= style.lineHeight * SHORT_PARAGRAPH_RATIO) {
+        out.push({
+          source: child,
+          charStart: -1,
+          charEnd: -1,
+          height: child.offsetHeight,
+          splittable: false,
+          breakAfterAvoid: false,
+          kind: baseKind
+        })
+        continue
+      }
+      let measured: { lineHeight: number; lines: { startIdx: number; endIdx: number }[] }
+      try {
+        measured = measurer(text, style, metrics.innerWidthPx)
+      } catch {
+        out.push({
+          source: child,
+          charStart: -1,
+          charEnd: -1,
+          height: child.offsetHeight,
+          splittable: false,
+          breakAfterAvoid: false,
+          kind: baseKind
+        })
+        continue
+      }
+      for (const lr of measured.lines) {
+        out.push({
+          source: child,
+          charStart: lr.startIdx,
+          charEnd: lr.endIdx,
+          height: measured.lineHeight,
+          splittable: true,
+          breakAfterAvoid: false,
+          kind: baseKind
+        })
+      }
+      continue
+    }
+    // 알 수 없는 element — unit 으로 취급 (분할 X)
+    out.push({
+      source: child,
+      charStart: -1,
+      charEnd: -1,
+      height: child.offsetHeight,
+      splittable: false,
+      breakAfterAvoid: false,
+      kind: 'unit'
+    })
+  }
+  return out
+}
+
+/**
  * Line[] → page groups. heading orphan 방지 규칙 포함.
  *
  * heading orphan: heading line 이 group 의 *마지막* 위치이고 다음 line 이
