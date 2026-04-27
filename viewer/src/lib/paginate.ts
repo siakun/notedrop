@@ -2,10 +2,26 @@ import type { LayoutMode, ViewSettings } from '@/types/viewSettings'
 import { PAGE_DIMS } from '@/types/viewSettings'
 import {
   buildLineStream,
+  groupLinesBySource,
   renderLineGroups,
-  splitByLineHeight
+  splitByLineHeight,
+  type SourceGroup
 } from './lineStream'
 import { createPretextMeasurer } from './paragraphSplit'
+
+/**
+ * 한 페이지의 데이터. PaperPage 컴포넌트가 source 들을 cloneNode/extract 해서
+ * mount. SourceGroup 의 source 는 *measure container* 의 원본 element reference.
+ */
+export type PageData = {
+  sourceGroups: SourceGroup[]
+  layout: LayoutMode
+}
+
+export type LayoutResult = {
+  pages: PageData[]
+  fit: PageFit | null
+}
 
 export function mmToPx(mm: number): number {
   return mm * (96 / 25.4)
@@ -206,6 +222,62 @@ export function paginateVertical(
   } else {
     renderLineGroups(content, lineGroups)
   }
+}
+
+/**
+ * 측정 + paginate. content (markdown 렌더된 children 컨테이너) 입력 → LayoutResult
+ * 반환. content 의 children 자체를 측정 — content 는 정확한 width/styles 를
+ * 갖는 measure container 의무 (off-screen paper-page 또는 visible paper-page).
+ *
+ * **Side effect 없음** — content 의 children 변경 X. PageData.sourceGroups 의 source
+ * reference 가 content 안 element. PaperPage 컴포넌트가 mount 시 cloneNode + 필요
+ * 시 extractCharRange.
+ */
+export function computeLayout(
+  content: HTMLElement,
+  settings: ViewSettings,
+  layout: LayoutMode
+): LayoutResult {
+  if (layout === 'default') return { pages: [], fit: null }
+
+  const flat = Array.from(content.children) as HTMLElement[]
+  if (flat.length === 0) return { pages: [], fit: null }
+
+  let innerHeightPx: number
+  let innerWidthPx: number
+  let fit: PageFit | null = null
+
+  if (layout === 'vertical' && settings.pageSize === 'Auto') {
+    fit = computePageFit(settings, layout)
+    if (!fit) return { pages: [], fit: null }
+    innerHeightPx = fit.innerHeight
+    innerWidthPx = fit.width - fit.padLeft - fit.padRight
+  } else if (layout === 'vertical') {
+    const dims = PAGE_DIMS[settings.pageSize]
+    innerHeightPx = mmToPx(dims.h - settings.marginTop - settings.marginBottom)
+    innerWidthPx = mmToPx(dims.w - settings.marginLeft - settings.marginRight)
+  } else {
+    fit = computePageFit(settings, layout)
+    if (!fit) return { pages: [], fit: null }
+    innerHeightPx = fit.innerHeight
+    innerWidthPx = fit.width - fit.padLeft - fit.padRight
+  }
+
+  if (innerHeightPx <= 0 || innerWidthPx <= 0) return { pages: [], fit }
+
+  const lineStream = buildLineStream(
+    flat,
+    { innerWidthPx, innerHeightPx },
+    createPretextMeasurer()
+  )
+  const lineGroups = splitByLineHeight(lineStream, innerHeightPx)
+
+  const pages: PageData[] = lineGroups.map((group) => ({
+    sourceGroups: groupLinesBySource(group),
+    layout
+  }))
+
+  return { pages, fit }
 }
 
 export type StripPagination = {

@@ -21,6 +21,7 @@ import {
   type ViewSettings
 } from '@/types/viewSettings'
 import { applyViewSettings } from '@/lib/viewSettings'
+import type { PageData, PageFit } from '@/lib/paginate'
 
 type SettingsSlice = {
   settings: ViewSettings
@@ -38,6 +39,10 @@ export type IndicatorState = {
 type PaginateSlice = {
   indicator: IndicatorState
   setIndicator: (state: IndicatorState) => void
+  // paginate 결과 — PageData[] + fit. PaperPage 컴포넌트가 source 배치 의무.
+  pages: PageData[]
+  fit: PageFit | null
+  setLayoutResult: (pages: PageData[], fit: PageFit | null) => void
 }
 
 export type LiveStatus = 'idle' | 'connected' | 'updated' | 'reconnecting'
@@ -99,9 +104,12 @@ export const useViewerStore = create<ViewerStore>()(
         set({ settings: VS_DEFAULTS })
       },
 
-      // Paginate slice — indicator 만 1차 단계. lineGroups / pages 는 후속.
+      // Paginate slice
       indicator: INITIAL_INDICATOR,
       setIndicator: (state) => set({ indicator: state }),
+      pages: [],
+      fit: null,
+      setLayoutResult: (pages, fit) => set({ pages, fit }),
 
       // Live reload slice — preview server SSE 연결 상태.
       liveStatus: 'idle',
@@ -157,6 +165,21 @@ export function useIndicator(): IndicatorState {
 /** Hook — setIndicator 함수만. */
 export function useSetIndicator(): (state: IndicatorState) => void {
   return useViewerStore((s) => s.setIndicator)
+}
+
+/** Hook — paginate 결과 (pages + fit). PaginatedView 가 구독. */
+export function usePaginateResult(): { pages: PageData[]; fit: PageFit | null } {
+  const pages = useViewerStore((s) => s.pages)
+  const fit = useViewerStore((s) => s.fit)
+  return { pages, fit }
+}
+
+/** Hook — setLayoutResult 함수만. */
+export function useSetLayoutResult(): (
+  pages: PageData[],
+  fit: PageFit | null
+) => void {
+  return useViewerStore((s) => s.setLayoutResult)
 }
 
 /** Hook — live reload 상태. */
