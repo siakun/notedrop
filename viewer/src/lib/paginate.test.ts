@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { clamp, mmToPx, round1, splitByHeight } from './paginate'
+import { clamp, mmToPx, paginateVertical, round1, splitByHeight } from './paginate'
+import { VS_DEFAULTS } from '@/types/viewSettings'
 
 describe('mmToPx', () => {
   it('mm → px 변환 (96 DPI)', () => {
@@ -56,5 +57,33 @@ describe('splitByHeight', () => {
     const heights = [50, 50]
     const groups = splitByHeight(heights, 100)
     expect(groups).toEqual([[0, 1]])
+  })
+})
+
+describe('paginateVertical (회귀)', () => {
+  // jsdom 에서 pretext canvas 부재 → measurer throw → splitParagraph fallback.
+  // 따라서 expandLargeParagraphs 가 통합돼도 짧은 단락은 기존과 동일 동작.
+
+  it('짧은 단락 1개 → 단일 paper-page 1개', () => {
+    const content = document.createElement('div')
+    const p = document.createElement('p')
+    p.textContent = 'short'
+    content.appendChild(p)
+    document.body.appendChild(content)
+
+    paginateVertical(content, { ...VS_DEFAULTS, layout: 'vertical', pageSize: 'A4' })
+
+    const pages = content.querySelectorAll('.paper-page')
+    expect(pages.length).toBe(1)
+    expect(pages[0]!.textContent).toBe('short')
+    document.body.removeChild(content)
+  })
+
+  it('빈 content → no-op', () => {
+    const content = document.createElement('div')
+    document.body.appendChild(content)
+    paginateVertical(content, { ...VS_DEFAULTS, layout: 'vertical', pageSize: 'A4' })
+    expect(content.children.length).toBe(0)
+    document.body.removeChild(content)
   })
 })

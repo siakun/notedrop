@@ -1,5 +1,6 @@
 import type { LayoutMode, ViewSettings } from '@/types/viewSettings'
 import { PAGE_DIMS } from '@/types/viewSettings'
+import { createPretextMeasurer, expandLargeParagraphs } from './paragraphSplit'
 
 export function mmToPx(mm: number): number {
   return mm * (96 / 25.4)
@@ -144,7 +145,10 @@ export function paginateVertical(
   const innerHeightPx = mmToPx(
     dims.h - settings.marginTop - settings.marginBottom
   )
-  if (innerHeightPx <= 0) return
+  const innerWidthPx = mmToPx(
+    dims.w - settings.marginLeft - settings.marginRight
+  )
+  if (innerHeightPx <= 0 || innerWidthPx <= 0) return
 
   const flat = Array.from(content.children) as HTMLElement[]
   if (flat.length === 0) return
@@ -154,13 +158,21 @@ export function paginateVertical(
   content.innerHTML = ''
   content.appendChild(initialPage)
 
-  const heights = flat.map((c) => c.offsetHeight)
+  // 긴 단락 사전 분할 — splitByHeight 는 element 단위만 자르므로 단일 단락이
+  // innerHeight 를 초과하는 케이스를 여기서 줄 단위로 미리 쪼갠다.
+  const expanded = expandLargeParagraphs(
+    initialPage,
+    flat,
+    { innerWidthPx, innerHeightPx },
+    createPretextMeasurer()
+  )
+  const heights = expanded.map((c) => c.offsetHeight)
   const groups = splitByHeight(heights, innerHeightPx)
 
   content.innerHTML = ''
   for (const group of groups) {
     const page = createPaperPage()
-    for (const idx of group) page.appendChild(flat[idx]!)
+    for (const idx of group) page.appendChild(expanded[idx]!)
     content.appendChild(page)
   }
 }
