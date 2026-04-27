@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer'
-import { useViewSettings } from '@/components/providers/ViewSettingsProvider'
+import { useViewSettings } from '@/stores/viewerStore'
 import { useContent } from '@/hooks/useContent'
 import { useCustomCss } from '@/hooks/useCustomCss'
 import { useLayoutPagination } from '@/hooks/useLayoutPagination'
@@ -40,7 +40,7 @@ export default function EntryView({
   const target = chapter ?? entry
   const targetHash = target.hash
   const { content, error } = useContent(targetHash)
-  const { settings } = useViewSettings()
+  const settings = useViewSettings()
 
   // settings 가 변경되면 MarkdownRenderer 의 key 가 바뀌어 unmount + remount
   // → 새 paginate trigger. 사용자 노트 콘텐츠 변경 (renderToken) 도 같이.

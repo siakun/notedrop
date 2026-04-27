@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import 'katex/dist/katex.min.css'
 import './globals.css'
-import ViewSettingsProvider from '@/components/providers/ViewSettingsProvider'
 
 export const metadata: Metadata = {
   title: 'notedrop',
@@ -13,9 +12,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ko">
-      <body data-layout="default">
-        <ViewSettingsProvider>{children}</ViewSettingsProvider>
-      </body>
+      <body data-layout="default">{children}</body>
     </html>
   )
 }

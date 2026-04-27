@@ -1,7 +1,7 @@
 'use client'
 
 import { type CSSProperties, useEffect, useRef, useState } from 'react'
-import { useViewSettings } from '@/components/providers/ViewSettingsProvider'
+import { usePatchSettings, useViewSettings } from '@/stores/viewerStore'
 import {
   FONT_MAX,
   FONT_MIN,
@@ -58,7 +58,8 @@ const MARGIN_KEYS = {
 } as const
 
 export default function ViewSettingsPanel() {
-  const { settings, patch } = useViewSettings()
+  const settings = useViewSettings()
+  const patch = usePatchSettings()
   const [open, setOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const btnRef = useRef<HTMLButtonElement>(null)

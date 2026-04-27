@@ -1,6 +1,6 @@
 {
   "name": "@notedrop/viewer",
-  "version": "0.1.55",
+  "version": "0.1.56",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -26,7 +26,8 @@
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.1",
     "unified": "^11.0.5",
-    "unist-util-visit": "^5.0.0"
+    "unist-util-visit": "^5.0.0",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@testing-library/react": "^16.0.1",

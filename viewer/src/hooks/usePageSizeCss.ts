@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useViewSettings } from '@/components/providers/ViewSettingsProvider'
+import { useViewSettings } from '@/stores/viewerStore'
 import { PAGE_DIMS } from '@/types/viewSettings'
 import { mmToPx } from '@/lib/paginate'
 
@@ -13,7 +13,7 @@ import { mmToPx } from '@/lib/paginate'
  * Default layout 은 paper-page 미사용이라 변수 미참조 — 단 설정해도 무해.
  */
 export function usePageSizeCss(): void {
-  const { settings } = useViewSettings()
+  const settings = useViewSettings()
 
   useEffect(() => {
     if (typeof document === 'undefined') return
