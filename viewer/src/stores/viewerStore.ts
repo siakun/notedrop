@@ -122,8 +122,14 @@ export const useViewerStore = create<ViewerStore>()(
       // 옛 ViewSettingsProvider 의 storage 형식 (직렬화 ViewSettings 만) → Zustand
       // persist 형식 ({state: {settings}, version}) 마이그레이션.
       migrate: (persistedState, version): { settings: ViewSettings } => {
+        // 동일 version 이라도 VS_DEFAULTS 와 항상 merge — 새 ViewSettings 필드 추가 시
+        // 기존 사용자 localStorage 가 누락 필드를 undefined 로 들고 있어 a11y / 토글 동작
+        // 깨지는 회귀 방지.
         if (version === STORE_VERSION) {
-          return persistedState as { settings: ViewSettings }
+          const cur = persistedState as { settings?: Partial<ViewSettings> } | null
+          return {
+            settings: { ...VS_DEFAULTS, ...(cur?.settings ?? {}) }
+          }
         }
         // 버전 0 (옛 형식): {theme, layout, pageSize, ...} 직렬 = ViewSettings 자체.
         const old = persistedState as Record<string, unknown> & {
