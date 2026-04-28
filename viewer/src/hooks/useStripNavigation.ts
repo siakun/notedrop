@@ -25,24 +25,41 @@ export function useStripNavigation(
 ): void {
   const setIndicator = useSetIndicator()
   const [current, setCurrent] = useState(0)
-  const isFirstUpdate = useRef(true)
+  const prevLayoutRef = useRef<LayoutMode | null>(null)
+  const prevTotalRef = useRef<number>(0)
 
   const isStrip = layout === 'horizontal' || layout === 'two-pages'
   const pagesPerView = layout === 'two-pages' ? 2 : 1
 
-  // total 또는 layout 변경 시 current 리셋
-  useEffect(() => {
-    setCurrent(0)
-    isFirstUpdate.current = true
-  }, [total, layout])
-
-  // strip transform — current 변경 시 transition 정상, 초기엔 transition 비활성
+  // strip transform — layout/total 변경 직후만 transition 비활성 (snap), 그 외엔
+  // 정상 transition. layout 또는 total 변경 시 current 도 inline 으로 0 으로 리셋.
+  // (별도 useEffect 로 리셋하면 paint 후 isFirstUpdate 가 재무장돼 첫 wheel 이
+  // 애니메이션 없이 snap 으로 동작하던 회귀 — 단일 layoutEffect 통합으로 해결.)
   useLayoutEffect(() => {
-    if (!isStrip) return
+    if (!isStrip) {
+      prevLayoutRef.current = null
+      prevTotalRef.current = 0
+      return
+    }
     const strip = stripRef.current
     if (!strip) return
     const pages = strip.querySelectorAll('.paper-page')
     if (pages.length === 0) return
+
+    const layoutChanged = prevLayoutRef.current !== layout
+    const totalChanged = prevTotalRef.current !== total
+
+    // layout/total 변경 + current 가 아직 0 이 아니면 0 으로 리셋 후 재렌더 대기.
+    // refs 는 이번 패스에서 갱신하지 않아 다음 패스에서도 layoutChanged=true 로
+    // snap 처리됨.
+    if ((layoutChanged || totalChanged) && current !== 0) {
+      setCurrent(0)
+      return
+    }
+
+    prevLayoutRef.current = layout
+    prevTotalRef.current = total
+
     const pageW = (pages[0] as HTMLElement).offsetWidth
     const groupSize = pagesPerView
     const groupIdx = Math.floor(current / groupSize)
@@ -50,18 +67,17 @@ export function useStripNavigation(
     const groupWidth = groupSize * pageW + (groupSize - 1) * PAGE_GAP
     const groupCenter = groupLeft + groupWidth / 2
 
-    if (isFirstUpdate.current) {
+    if (layoutChanged || totalChanged) {
       strip.style.transition = 'none'
       strip.style.transform = `translate(${-groupCenter}px, -50%)`
       void strip.offsetHeight
       requestAnimationFrame(() => {
         strip.style.transition = ''
       })
-      isFirstUpdate.current = false
     } else {
       strip.style.transform = `translate(${-groupCenter}px, -50%)`
     }
-  }, [stripRef, isStrip, current, pagesPerView, total])
+  }, [stripRef, isStrip, layout, current, pagesPerView, total])
 
   // indicator state 갱신
   useEffect(() => {
