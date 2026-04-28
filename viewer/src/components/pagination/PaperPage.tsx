@@ -36,17 +36,38 @@ export default function PaperPage({ sourceGroups, fit }: PaperPageProps) {
       const isListItem = sg.lines[0]!.kind === 'list-item'
 
       if (isListItem) {
+        const originalParent = sg.source.parentElement
         const originalListTag =
-          sg.source.parentElement?.tagName.toLowerCase() === 'ol' ? 'ol' : 'ul'
+          originalParent?.tagName.toLowerCase() === 'ol' ? 'ol' : 'ul'
         if (
           !pendingList ||
           pendingList.tagName.toLowerCase() !== originalListTag
         ) {
           pendingList = doc.createElement(originalListTag)
-          if (sg.source.parentElement) {
-            for (const attr of Array.from(sg.source.parentElement.attributes)) {
+          if (originalParent) {
+            for (const attr of Array.from(originalParent.attributes)) {
               if (attr.name === 'id') continue
               pendingList.setAttribute(attr.name, attr.value)
+            }
+            // <ol> 가 페이지 사이에 split 되면 새 페이지의 <ol> 은 기본적으로
+            // 1 부터 다시 카운트. start 속성을 원본 ol 안 li 의 위치 기반으로
+            // 명시해 (1, 2, 3) → (4, 5) 처럼 연속 번호 유지.
+            if (originalListTag === 'ol') {
+              const originalStart = parseInt(
+                originalParent.getAttribute('start') ?? '1',
+                10
+              )
+              const idxInParent = Array.from(originalParent.children).indexOf(
+                sg.source
+              )
+              const safeIdx = idxInParent >= 0 ? idxInParent : 0
+              const newStart =
+                (Number.isFinite(originalStart) ? originalStart : 1) + safeIdx
+              if (newStart !== 1) {
+                pendingList.setAttribute('start', String(newStart))
+              } else {
+                pendingList.removeAttribute('start')
+              }
             }
           }
           el.appendChild(pendingList)
