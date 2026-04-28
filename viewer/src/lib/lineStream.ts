@@ -14,6 +14,7 @@
 import {
   type FontStyle,
   type LineRangeMeasurer,
+  type RichInlineMeasurer,
   splitElementAtCharIndex
 } from './paragraphSplit'
 
@@ -145,7 +146,7 @@ function measureLineGroupHeight(lines: Line[]): number {
 
 /** measurer / splitElementAtCharIndex export 는 lineStream 내부 import 만 — 외부 재export 안 함. */
 export { splitElementAtCharIndex }
-export type { FontStyle, LineRangeMeasurer }
+export type { FontStyle, LineRangeMeasurer, RichInlineMeasurer }
 
 /**
  * element[] → Line[]. element 종류별 분류 + line 발생.
@@ -162,14 +163,15 @@ export type { FontStyle, LineRangeMeasurer }
 export function buildLineStream(
   children: HTMLElement[],
   metrics: LineStreamMetrics,
-  measurer: LineRangeMeasurer
+  measurer: LineRangeMeasurer,
+  richInlineMeasurer?: RichInlineMeasurer
 ): Line[] {
   const out: Line[] = []
   for (const child of children) {
     const margins = readBlockMargins(child)
     if (isListContainer(child)) {
       const liChildren = Array.from(child.children) as HTMLElement[]
-      const liLines = buildLineStream(liChildren, metrics, measurer)
+      const liLines = buildLineStream(liChildren, metrics, measurer, richInlineMeasurer)
       // <ul>/<ol> 컨테이너 자체의 vertical margin 을 line stream 에 흘려보냄.
       // 자식 <li> 의 기본 marginTop/marginBottom 은 0 인 경우가 대부분이라
       // 컨테이너 마진이 누락되면 list 등장 시마다 페이지가 ~16-17px 씩 over.
@@ -251,13 +253,39 @@ export function buildLineStream(
         })
         continue
       }
-      // Inline 포맷팅 (<strong>/<em>/<code>/<b>/<i>) 이 들어 있으면 pretext 가
-      // textContent 만으로 폭을 측정해 wrap 위치를 underestimate. plain text 기준
-      // line 1 안에 들어간다고 본 char 범위가 실제 렌더 시 bold 로 더 넓어져 2 line
-      // 으로 wrap → 한 line 분량의 height (lineHeight) 만 알고리즘에 누적되지만
-      // 실제는 2 line (2 × lineHeight) 차지 → 페이지마다 ~lineHeight px 씩 overflow.
-      // 안전 fallback: split 비활성, offsetHeight 단위 1 line 으로 처리.
-      if (child.querySelector('strong, em, b, i, code')) {
+      // Inline 포맷팅 (<strong>/<em>/<code>/<b>/<i>) 이 들어 있으면 단일 font
+      // shorthand 기반 measurer 는 plain text 기준으로 wrap 을 underestimate.
+      // bold / italic / monospace 의 폭 차이를 모르고 line 1 에 더 많은 char 를
+      // 묶음 → 실제 렌더는 더 일찍 wrap → 한 line 분량 height (lineHeight) 만
+      // 알고리즘에 누적됐는데 실제는 2 line 차지 → 페이지마다 ~lineHeight px overflow.
+      //
+      // 해결: rich-inline measurer (richInlineMeasurer) 가 element 의 text node
+      // 를 부모 element 의 computed font 와 함께 segment 로 모아 정확히 측정.
+      // null 반환 (jsdom 등 환경) 또는 throw 시 split 비활성 unit 으로 fallback.
+      const hasInlineFormatting = !!child.querySelector(
+        'strong, em, b, i, code'
+      )
+      // measurer 에 전달할 effective width — element 의 actual rendered content
+      // 폭 (clientWidth) 우선. 부모가 padding 을 가진 <ul>/<ol> 안 <li> 의 경우
+      // metrics.innerWidthPx (paper-page innerWidth) 가 ul.padding-left 만큼 더
+      // 넓어 wrap 을 underestimate → wrap 위치가 실제 렌더보다 늦게 잡힘.
+      const effectiveWidthPx = child.clientWidth || metrics.innerWidthPx
+      let measured: { lineHeight: number; lines: { startIdx: number; endIdx: number }[] } | null = null
+      if (hasInlineFormatting && richInlineMeasurer) {
+        try {
+          measured = richInlineMeasurer(child, effectiveWidthPx)
+        } catch {
+          measured = null
+        }
+      }
+      if (!measured) {
+        try {
+          measured = measurer(text, style, effectiveWidthPx)
+        } catch {
+          measured = null
+        }
+      }
+      if (!measured) {
         out.push({
           source: child,
           charStart: -1,
@@ -271,10 +299,10 @@ export function buildLineStream(
         })
         continue
       }
-      let measured: { lineHeight: number; lines: { startIdx: number; endIdx: number }[] }
-      try {
-        measured = measurer(text, style, metrics.innerWidthPx)
-      } catch {
+      // hasInlineFormatting 인데 rich-inline measurer 가 없거나 실패해서 simple
+      // measurer 로 떨어지면 위 underestimate 함정에 빠짐 — split 비활성 unit 으로
+      // 강제 fallback (offsetHeight 정확).
+      if (hasInlineFormatting && (measured.lines.length === 0 || !richInlineMeasurer)) {
         out.push({
           source: child,
           charStart: -1,

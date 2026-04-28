@@ -18,6 +18,12 @@ import {
   walkLineRanges,
   type WordBreakMode
 } from '@chenglou/pretext'
+import {
+  prepareRichInline,
+  walkRichInlineLineRanges,
+  materializeRichInlineLineRange,
+  type RichInlineItem
+} from '@chenglou/pretext/rich-inline'
 
 /** pretext 의 WhiteSpaceMode (analysis.d.ts) — layout entry 에서 re-export 안 됨 */
 type PretextWhiteSpace = 'normal' | 'pre-wrap'
@@ -49,6 +55,22 @@ export type LineRangeMeasurer = (
   style: FontStyle,
   widthPx: number
 ) => MeasureResult
+
+/**
+ * inline 포맷팅 (<strong>/<em>/<code> 등) 이 포함된 element 의 정확한 line wrap
+ * 을 측정. element 의 text node 들을 부모 element 의 computed font 와 함께 segment
+ * 로 모아 pretext rich-inline API 에 넘김.
+ *
+ * 단순 LineRangeMeasurer (textContent + 단일 font shorthand) 가 underestimate
+ * 하던 inline-formatted 콘텐츠도 정확히 측정 → split 가능.
+ *
+ * jsdom 환경 등 view (defaultView) 가 없거나 segment 가 비어 있으면 null —
+ * 호출자가 fallback 처리.
+ */
+export type RichInlineMeasurer = (
+  el: HTMLElement,
+  widthPx: number
+) => MeasureResult | null
 
 /**
  * el 안의 textNode 들을 in-order 순회하며 누적 char count 가 target 에 도달한
@@ -175,5 +197,78 @@ export function createPretextMeasurer(): LineRangeMeasurer {
     })
     const lines = mapLineTextsToRanges(text, lineTexts)
     return { lineHeight: style.lineHeight, lines }
+  }
+}
+
+/**
+ * RichInlineMeasurer 의 pretext rich-inline 어댑터. element 의 text node 들을
+ * 부모 element 의 computed font 와 함께 RichInlineItem[] 로 모아 segment 별 폭
+ * 차이 (bold / italic / monospace) 를 정확히 반영해 line break 위치를 산출.
+ */
+export function createRichInlineMeasurer(): RichInlineMeasurer {
+  return (el, widthPx) => {
+    const doc = el.ownerDocument
+    const view = doc.defaultView
+    if (!view) return null
+
+    const baseCs = view.getComputedStyle(el)
+    const baseFontSize = parseFloat(baseCs.fontSize) || 16
+    const baseLineHeight =
+      parseFloat(baseCs.lineHeight) || baseFontSize * 1.5
+
+    const items: RichInlineItem[] = []
+    const walker = doc.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+    let node = walker.nextNode() as Text | null
+    while (node) {
+      const text = node.data
+      if (text.length > 0) {
+        const parent = node.parentElement
+        if (parent) {
+          const cs = view.getComputedStyle(parent)
+          const fontStyle: FontStyle = {
+            fontFamily: cs.fontFamily,
+            fontSize: parseFloat(cs.fontSize) || baseFontSize,
+            fontWeight: cs.fontWeight,
+            fontStyle: cs.fontStyle,
+            lineHeight:
+              parseFloat(cs.lineHeight) ||
+              (parseFloat(cs.fontSize) || baseFontSize) * 1.5,
+            letterSpacing: parseFloat(cs.letterSpacing) || 0,
+            whiteSpace: cs.whiteSpace,
+            wordBreak: cs.wordBreak
+          }
+          items.push({
+            text,
+            font: buildFontShorthand(fontStyle),
+            letterSpacing: fontStyle.letterSpacing
+          })
+        }
+      }
+      node = walker.nextNode() as Text | null
+    }
+
+    if (items.length === 0) return { lineHeight: baseLineHeight, lines: [] }
+
+    let prepared
+    try {
+      prepared = prepareRichInline(items)
+    } catch {
+      return null
+    }
+
+    const lineTexts: string[] = []
+    try {
+      walkRichInlineLineRanges(prepared, widthPx, (lineRange) => {
+        const line = materializeRichInlineLineRange(prepared, lineRange)
+        const text = line.fragments.map((f) => f.text).join('')
+        if (text.length > 0) lineTexts.push(text)
+      })
+    } catch {
+      return null
+    }
+
+    const fullText = el.textContent ?? ''
+    const lines = mapLineTextsToRanges(fullText, lineTexts)
+    return { lineHeight: baseLineHeight, lines }
   }
 }

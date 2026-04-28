@@ -6,7 +6,7 @@ import {
   splitByLineHeight,
   type SourceGroup
 } from './lineStream'
-import { createPretextMeasurer } from './paragraphSplit'
+import { createPretextMeasurer, createRichInlineMeasurer } from './paragraphSplit'
 
 /**
  * 한 페이지의 데이터. PaperPage 컴포넌트가 source 들을 cloneNode/extract 해서
@@ -169,7 +169,8 @@ export function computeLayout(
   const lineStream = buildLineStream(
     flat,
     { innerWidthPx, innerHeightPx },
-    createPretextMeasurer()
+    createPretextMeasurer(),
+    createRichInlineMeasurer()
   )
   const lineGroups = splitByLineHeight(lineStream, innerHeightPx)
 
