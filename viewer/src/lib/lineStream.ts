@@ -251,6 +251,26 @@ export function buildLineStream(
         })
         continue
       }
+      // Inline 포맷팅 (<strong>/<em>/<code>/<b>/<i>) 이 들어 있으면 pretext 가
+      // textContent 만으로 폭을 측정해 wrap 위치를 underestimate. plain text 기준
+      // line 1 안에 들어간다고 본 char 범위가 실제 렌더 시 bold 로 더 넓어져 2 line
+      // 으로 wrap → 한 line 분량의 height (lineHeight) 만 알고리즘에 누적되지만
+      // 실제는 2 line (2 × lineHeight) 차지 → 페이지마다 ~lineHeight px 씩 overflow.
+      // 안전 fallback: split 비활성, offsetHeight 단위 1 line 으로 처리.
+      if (child.querySelector('strong, em, b, i, code')) {
+        out.push({
+          source: child,
+          charStart: -1,
+          charEnd: -1,
+          height: child.offsetHeight,
+          marginTop: margins.marginTop,
+          marginBottom: margins.marginBottom,
+          splittable: false,
+          breakAfterAvoid: false,
+          kind: baseKind
+        })
+        continue
+      }
       let measured: { lineHeight: number; lines: { startIdx: number; endIdx: number }[] }
       try {
         measured = measurer(text, style, metrics.innerWidthPx)
