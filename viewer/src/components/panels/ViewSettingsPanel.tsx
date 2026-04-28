@@ -43,19 +43,57 @@ const ALIGN_OPTIONS: { value: AlignMode; label: string }[] = [
   { value: 'justify', label: '양쪽' }
 ]
 
-const MARGIN_FIELDS: { side: 'top' | 'bottom' | 'left' | 'right'; icon: string; key: keyof typeof MARGIN_KEYS }[] = [
-  { side: 'top', icon: '↑', key: 'top' },
-  { side: 'bottom', icon: '↓', key: 'bottom' },
-  { side: 'left', icon: '←', key: 'left' },
-  { side: 'right', icon: '→', key: 'right' }
-]
-
 const MARGIN_KEYS = {
   top: 'marginTop',
   bottom: 'marginBottom',
   left: 'marginLeft',
   right: 'marginRight'
 } as const
+
+type MarginSide = keyof typeof MARGIN_KEYS
+type StepDirection = 'up' | 'down'
+
+const MARGIN_FIELDS: { side: MarginSide; key: MarginSide }[] = [
+  { side: 'top', key: 'top' },
+  { side: 'bottom', key: 'bottom' },
+  { side: 'left', key: 'left' },
+  { side: 'right', key: 'right' }
+]
+
+function MarginDirectionIcon({ side }: { side: MarginSide }) {
+  const path = {
+    top: 'M8 13V3M4.5 6.5 8 3l3.5 3.5',
+    bottom: 'M8 3v10M4.5 9.5 8 13l3.5-3.5',
+    left: 'M13 8H3M6.5 4.5 3 8l3.5 3.5',
+    right: 'M3 8h10M9.5 4.5 13 8l-3.5 3.5'
+  }[side]
+
+  return (
+    <svg
+      className="vs-margin-direction-icon"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d={path} />
+    </svg>
+  )
+}
+
+function StepChevronIcon({ direction }: { direction: StepDirection }) {
+  const path = direction === 'up' ? 'M3 6.5 6 3.5l3 3' : 'M3 3.5l3 3 3-3'
+
+  return (
+    <svg
+      className="vs-margin-step-icon"
+      viewBox="0 0 12 10"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d={path} />
+    </svg>
+  )
+}
 
 export default function ViewSettingsPanel() {
   const settings = useViewSettings()
@@ -151,12 +189,17 @@ export default function ViewSettingsPanel() {
             <div className="vs-margins">
               {MARGIN_FIELDS.map((f) => {
                 const settingKey = MARGIN_KEYS[f.key]
+                const inputId = `vs-margin-${f.side}`
                 return (
-                  <label key={f.side} className="vs-margin">
+                  <div key={f.side} className="vs-margin">
                     <span className="vs-margin-icon" aria-hidden="true">
-                      {f.icon}
+                      <MarginDirectionIcon side={f.side} />
                     </span>
+                    <label className="vs-margin-label" htmlFor={inputId}>
+                      {f.side} 여백
+                    </label>
                     <input
+                      id={inputId}
                       type="number"
                       min={MARGIN_MIN}
                       max={MARGIN_MAX}
@@ -171,11 +214,11 @@ export default function ViewSettingsPanel() {
                       }}
                       aria-label={`${f.side} 여백`}
                     />
-                    <span className="vs-margin-stepper" aria-hidden="true">
+                    <span className="vs-margin-stepper">
                       <button
                         type="button"
                         className="vs-margin-step"
-                        tabIndex={-1}
+                        aria-label={`${f.side} 여백 늘리기`}
                         onClick={() =>
                           patch({
                             [settingKey]: clamp(
@@ -186,12 +229,12 @@ export default function ViewSettingsPanel() {
                           })
                         }
                       >
-                        ▴
+                        <StepChevronIcon direction="up" />
                       </button>
                       <button
                         type="button"
                         className="vs-margin-step"
-                        tabIndex={-1}
+                        aria-label={`${f.side} 여백 줄이기`}
                         onClick={() =>
                           patch({
                             [settingKey]: clamp(
@@ -202,10 +245,10 @@ export default function ViewSettingsPanel() {
                           })
                         }
                       >
-                        ▾
+                        <StepChevronIcon direction="down" />
                       </button>
                     </span>
-                  </label>
+                  </div>
                 )
               })}
             </div>
