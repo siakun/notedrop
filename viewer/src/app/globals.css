@@ -321,13 +321,43 @@ body {
   font-size: 0.85rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 .vs-margin input:focus { outline: none; }
 .vs-margin input::-webkit-outer-spin-button,
 .vs-margin input::-webkit-inner-spin-button {
   -webkit-appearance: none;
+  appearance: none;
   margin: 0;
 }
+.vs-margin-stepper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  margin-left: 0.15rem;
+}
+.vs-margin-step {
+  background: transparent;
+  border: none;
+  padding: 0;
+  width: 0.9rem;
+  height: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted);
+  font-size: 0.55rem;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  opacity: 0.55;
+  transition: opacity 0.1s ease, color 0.1s ease;
+}
+.vs-margin:hover .vs-margin-step { opacity: 0.85; }
+.vs-margin-step:hover { opacity: 1; color: var(--color-accent); }
 
 .vs-themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
 .vs-theme {

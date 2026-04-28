@@ -171,6 +171,40 @@ export default function ViewSettingsPanel() {
                       }}
                       aria-label={`${f.side} 여백`}
                     />
+                    <span className="vs-margin-stepper" aria-hidden="true">
+                      <button
+                        type="button"
+                        className="vs-margin-step"
+                        tabIndex={-1}
+                        onClick={() =>
+                          patch({
+                            [settingKey]: clamp(
+                              settings[settingKey] + 1,
+                              MARGIN_MIN,
+                              MARGIN_MAX
+                            )
+                          })
+                        }
+                      >
+                        ▴
+                      </button>
+                      <button
+                        type="button"
+                        className="vs-margin-step"
+                        tabIndex={-1}
+                        onClick={() =>
+                          patch({
+                            [settingKey]: clamp(
+                              settings[settingKey] - 1,
+                              MARGIN_MIN,
+                              MARGIN_MAX
+                            )
+                          })
+                        }
+                      >
+                        ▾
+                      </button>
+                    </span>
                   </label>
                 )
               })}
