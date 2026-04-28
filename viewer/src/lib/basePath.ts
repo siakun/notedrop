@@ -10,11 +10,15 @@
  * Next.js 의 자동 basePath prefix 는 *Next.js 컴포넌트* (Image 등) 만 적용.
  * 사용자 hardcoded URL 은 이 helper 의무.
  *
+ * Production build (NODE_ENV='production') 에서만 placeholder 를 prefix.
+ * `next.config.mjs` 의 `basePath: isProd ? PLACEHOLDER : ''` 와 동일 정책 —
+ * dev / test 에서는 root path 그대로 (Next dev 가 public/ 직접 서빙).
+ *
  * @example
  *   // ❌ host root 기준 → GH Pages 호스팅 prefix mismatch
  *   const iconUrl = '/icons/view-settings/layout-default.svg'
  *
- *   // ✓ placeholder → publish 시 share repo segment 로 변환
+ *   // ✓ prod 빌드 시 placeholder, dev/test 에서는 그대로
  *   const iconUrl = withBase('/icons/view-settings/layout-default.svg')
  */
 const PLACEHOLDER = '/__NOTEDROP_BASE__'
@@ -26,6 +30,10 @@ export function withBase(path: string): string {
   }
   if (path.startsWith(PLACEHOLDER)) {
     // 이미 placeholder 적용 — 중복 방지
+    return path
+  }
+  if (process.env.NODE_ENV !== 'production') {
+    // dev / test: Next dev 가 root 에서 public 자산 서빙. placeholder 불필요.
     return path
   }
   return `${PLACEHOLDER}${path}`
