@@ -169,7 +169,24 @@ export function buildLineStream(
     const margins = readBlockMargins(child)
     if (isListContainer(child)) {
       const liChildren = Array.from(child.children) as HTMLElement[]
-      out.push(...buildLineStream(liChildren, metrics, measurer))
+      const liLines = buildLineStream(liChildren, metrics, measurer)
+      // <ul>/<ol> 컨테이너 자체의 vertical margin 을 line stream 에 흘려보냄.
+      // 자식 <li> 의 기본 marginTop/marginBottom 은 0 인 경우가 대부분이라
+      // 컨테이너 마진이 누락되면 list 등장 시마다 페이지가 ~16-17px 씩 over.
+      // CSS 부모-자식 마진 collapse 규칙과 동일한 max-or-sum 으로 합침.
+      if (liLines.length > 0) {
+        const first = liLines[0]!
+        const last = liLines[liLines.length - 1]!
+        first.marginTop = collapseVerticalMargins(
+          first.marginTop,
+          margins.marginTop
+        )
+        last.marginBottom = collapseVerticalMargins(
+          last.marginBottom,
+          margins.marginBottom
+        )
+      }
+      out.push(...liLines)
       continue
     }
     if (isHeading(child)) {
