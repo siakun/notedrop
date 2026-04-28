@@ -99,11 +99,12 @@ export function computePageFit(
 
   if (pageHeight <= 0 || pageWidth <= 0) return null
 
-  const scale = pageHeight / mmToPx(dims.h)
-  const padTop = mmToPx(settings.marginTop) * scale
-  const padBottom = mmToPx(settings.marginBottom) * scale
-  const padLeft = mmToPx(settings.marginLeft) * scale
-  const padRight = mmToPx(settings.marginRight) * scale
+  // Margins are user-facing visual spacing; keep them independent from
+  // page-size viewport scaling so Auto/B/A variants do not drift.
+  const padTop = mmToPx(settings.marginTop)
+  const padBottom = mmToPx(settings.marginBottom)
+  const padLeft = mmToPx(settings.marginLeft)
+  const padRight = mmToPx(settings.marginRight)
   const innerHeight = pageHeight - padTop - padBottom
 
   return {

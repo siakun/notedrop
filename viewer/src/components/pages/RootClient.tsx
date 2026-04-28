@@ -2,7 +2,6 @@
 
 import { useManifest } from '@/hooks/useManifest'
 import { useRoute } from '@/hooks/useRoute'
-import { usePageSizeCss } from '@/hooks/usePageSizeCss'
 import Header from '@/components/layout/Header'
 import Home from './Home'
 import EntryView from './EntryView'
@@ -27,7 +26,6 @@ export default function RootClient() {
   const { route, renderToken, mounted } = useRoute()
   const { manifest, error: manifestError } = useManifest()
   const indicator = useIndicator()
-  usePageSizeCss()
 
   if (!mounted) return null
 
