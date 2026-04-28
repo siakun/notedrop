@@ -3,6 +3,8 @@
 # .claude/skills/ and CLAUDE.md are generated as junction/hard link by scripts/link-agent-files.ps1
 .claude/
 CLAUDE.md
+# scripts/link-agent-files.ps1 가 hardlink 충돌 시 만드는 안전 backup — 추적 X
+CLAUDE.md.bak.*
 
 # build artifacts
 main.js

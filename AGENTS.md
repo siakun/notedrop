@@ -13,6 +13,23 @@ notedrop viewer UI 를 Obsidian publish / release / BRAT / GH Pages 없이 바�
 
 이 흐름은 local source 검증만 의미한다. Obsidian vault state, plugin command, publish output, cache key, release asset, GH Pages, BRAT 검증은 `notedrop-dogfood-automation` 을 사용한다.
 
+## 테스트 = 로컬 dev server. 버전 bump 는 fix 확정 시에만
+
+viewer UI · pagination · margin · layout · 스타일 · DOM · hover 등 동작을 *확인* 하기 위한 목적으로는 절대 version bump + release 하지 말 것. iteration 흐름:
+
+1. `notedrop-viewer-dev-preview` (또는 `notedrop-viewer-dev-server`) 로 localhost dev server 띄움
+2. 코드 수정 → HMR 자동 반영 → 브라우저에서 확인
+3. 문제 발견 시 dev server 살아있는 상태로 다시 수정 → 즉시 재확인
+4. 만족할 때까지 반복
+
+5 곳 version bump + `🔖 release(vX.Y.Z): ...` commit + `git push origin main` 은 *fix 가 확정되어 사용자에게 배포 준비가 됐을 때만*. release 를 "동작 확인용 build artifact 생성기" 로 쓰지 말 것.
+
+production (BRAT 설치 / GH Pages 배포) 동작 자체를 검증해야 하면 그건 `notedrop-dogfood-automation` 영역 — 그것도 5 곳 bump 와 별개 (실재 release asset 을 manual install 해서 확인하는 흐름).
+
+배경: 한 fix 를 위해 0.x.N → 0.x.N+1 → 0.x.N+2 처럼 release 가 빠르게 누적되면 BRAT dropdown 갱신 부담 + v0.1.63 listing index 사고 같은 회귀 위험이 누적된다. 검증은 로컬에서, release 는 한 번에.
+
+이 규칙은 메모리 `feedback_release_자율진행.md` 의 "자율 release 진행" 보다 우선한다 — 자율 release 는 fix 가 *이미 확정* 된 경우에만 적용.
+
 ## Release / tag 하네스 — 절대 규칙
 
 **`.github/workflows/release.yml` 가 tag 와 GitHub Release 를 자체 생성한다.** 로컬에서 tag 를 만들거나 push 하지 말 것.
