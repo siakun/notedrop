@@ -24,6 +24,8 @@ export type Line = {
   charStart: number   // -1 = 전체 element
   charEnd: number     // exclusive (-1 = 전체 element)
   height: number      // line-height 또는 element offsetHeight
+  marginTop: number   // source block 의 computed margin-top
+  marginBottom: number // source block 의 computed margin-bottom
   splittable: boolean // 같은 source 의 다른 line 들과 합쳐서 한 element 로 다시 묶을 수 있는지
   breakAfterAvoid: boolean  // 다음 line 과 분리 금지 (heading orphan 방지)
   kind: LineKind
@@ -97,6 +99,50 @@ function readFontStyle(el: HTMLElement): FontStyle {
   }
 }
 
+function readBlockMargins(el: HTMLElement): { marginTop: number; marginBottom: number } {
+  const cs = el.ownerDocument.defaultView!.getComputedStyle(el)
+  return {
+    marginTop: parseFloat(cs.marginTop) || 0,
+    marginBottom: parseFloat(cs.marginBottom) || 0
+  }
+}
+
+function collapseVerticalMargins(prevBottom: number, nextTop: number): number {
+  if (prevBottom >= 0 && nextTop >= 0) return Math.max(prevBottom, nextTop)
+  if (prevBottom <= 0 && nextTop <= 0) return Math.min(prevBottom, nextTop)
+  return prevBottom + nextTop
+}
+
+function measureLineGroupHeight(lines: Line[]): number {
+  if (lines.length === 0) return 0
+
+  let total = 0
+  let source: HTMLElement | null = null
+  let pendingBottom = 0
+  let hasBlock = false
+
+  for (const line of lines) {
+    if (source === line.source) {
+      total += line.height
+      pendingBottom = line.marginBottom
+      continue
+    }
+
+    if (hasBlock) {
+      total += collapseVerticalMargins(pendingBottom, line.marginTop)
+    } else {
+      total += line.marginTop
+      hasBlock = true
+    }
+
+    source = line.source
+    total += line.height
+    pendingBottom = line.marginBottom
+  }
+
+  return total + pendingBottom
+}
+
 /** measurer / splitElementAtCharIndex export 는 lineStream 내부 import 만 — 외부 재export 안 함. */
 export { splitElementAtCharIndex }
 export type { FontStyle, LineRangeMeasurer }
@@ -120,6 +166,7 @@ export function buildLineStream(
 ): Line[] {
   const out: Line[] = []
   for (const child of children) {
+    const margins = readBlockMargins(child)
     if (isListContainer(child)) {
       const liChildren = Array.from(child.children) as HTMLElement[]
       out.push(...buildLineStream(liChildren, metrics, measurer))
@@ -131,6 +178,8 @@ export function buildLineStream(
         charStart: -1,
         charEnd: -1,
         height: child.offsetHeight,
+        marginTop: margins.marginTop,
+        marginBottom: margins.marginBottom,
         splittable: false,
         breakAfterAvoid: true,
         kind: 'heading'
@@ -143,6 +192,8 @@ export function buildLineStream(
         charStart: -1,
         charEnd: -1,
         height: child.offsetHeight,
+        marginTop: margins.marginTop,
+        marginBottom: margins.marginBottom,
         splittable: false,
         breakAfterAvoid: false,
         kind: 'unit'
@@ -159,6 +210,8 @@ export function buildLineStream(
           charStart: -1,
           charEnd: -1,
           height: child.offsetHeight,
+          marginTop: margins.marginTop,
+          marginBottom: margins.marginBottom,
           splittable: false,
           breakAfterAvoid: false,
           kind: baseKind
@@ -173,6 +226,8 @@ export function buildLineStream(
           charStart: -1,
           charEnd: -1,
           height: child.offsetHeight,
+          marginTop: margins.marginTop,
+          marginBottom: margins.marginBottom,
           splittable: false,
           breakAfterAvoid: false,
           kind: baseKind
@@ -188,6 +243,8 @@ export function buildLineStream(
           charStart: -1,
           charEnd: -1,
           height: child.offsetHeight,
+          marginTop: margins.marginTop,
+          marginBottom: margins.marginBottom,
           splittable: false,
           breakAfterAvoid: false,
           kind: baseKind
@@ -200,6 +257,8 @@ export function buildLineStream(
           charStart: lr.startIdx,
           charEnd: lr.endIdx,
           height: measured.lineHeight,
+          marginTop: margins.marginTop,
+          marginBottom: margins.marginBottom,
           splittable: true,
           breakAfterAvoid: false,
           kind: baseKind
@@ -213,6 +272,8 @@ export function buildLineStream(
       charStart: -1,
       charEnd: -1,
       height: child.offsetHeight,
+      marginTop: margins.marginTop,
+      marginBottom: margins.marginBottom,
       splittable: false,
       breakAfterAvoid: false,
       kind: 'unit'
@@ -234,19 +295,19 @@ export function splitByLineHeight(
   innerHeightPx: number
 ): Line[][] {
   const groups: Line[][] = [[]]
-  let used = 0
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!
     let last = groups[groups.length - 1]!
 
-    if (used + line.height > innerHeightPx && last.length > 0) {
+    if (
+      measureLineGroupHeight([...last, line]) > innerHeightPx &&
+      last.length > 0
+    ) {
       groups.push([])
-      used = 0
       last = groups[groups.length - 1]!
     }
     last.push(line)
-    used += line.height
 
     // heading orphan 방지: line 이 push 된 직후 검사
     if (
@@ -260,12 +321,11 @@ export function splitByLineHeight(
       //   (2) heading + next 가 새 group 에 들어갈 수 있음 (이동해도 limit 안)
       // 둘 중 하나라도 안 맞으면 그대로 — limit 초과 강제 묶음 회피.
       if (
-        used + next.height > innerHeightPx &&
-        line.height + next.height <= innerHeightPx
+        measureLineGroupHeight([...last, next]) > innerHeightPx &&
+        measureLineGroupHeight([line, next]) <= innerHeightPx
       ) {
         last.pop()
         groups.push([line])
-        used = line.height
       }
     }
   }

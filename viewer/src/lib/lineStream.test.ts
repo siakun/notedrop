@@ -12,6 +12,8 @@ function L(opts: Partial<Line>): Line {
     charStart: 0,
     charEnd: 10,
     height: 20,
+    marginTop: 0,
+    marginBottom: 0,
     splittable: true,
     breakAfterAvoid: false,
     kind: 'paragraph',
@@ -31,6 +33,36 @@ describe('splitByLineHeight', () => {
     expect(groups.length).toBe(2)
     expect(groups[0]!.length).toBe(5)  // 5 × 20 = 100
     expect(groups[1]!.length).toBe(1)
+  })
+
+  it('source 간 collapsed vertical margin 을 포함해 page overflow 를 막는다', () => {
+    const p1 = document.createElement('p')
+    const p2 = document.createElement('p')
+    const lines = [
+      L({ source: p1, height: 50, marginBottom: 12 }),
+      L({ source: p2, height: 40, marginTop: 12 })
+    ]
+    // content height 만 보면 90px 이라 1 page 로 보이지만, 실제 DOM 은
+    // sibling margin collapse 후 50 + 12 + 40 = 102px 이다.
+    const groups = splitByLineHeight(lines, 100)
+    expect(groups.length).toBe(2)
+    expect(groups[0]).toEqual([lines[0]])
+    expect(groups[1]).toEqual([lines[1]])
+  })
+
+  it('같은 source 가 page fragment 로 렌더링될 때 top/bottom margin 을 포함한다', () => {
+    const p = document.createElement('p')
+    const lines = [
+      L({ source: p, height: 25, marginTop: 10, marginBottom: 10 }),
+      L({ source: p, height: 25, marginTop: 10, marginBottom: 10 }),
+      L({ source: p, height: 25, marginTop: 10, marginBottom: 10 })
+    ]
+    // 한 page 에 3줄을 넣으면 <p> fragment 의 margin 포함 높이는
+    // 10 + 25 + 25 + 25 + 10 = 95px 이라 80px page 를 넘는다.
+    const groups = splitByLineHeight(lines, 80)
+    expect(groups.length).toBe(2)
+    expect(groups[0]).toEqual([lines[0], lines[1]])
+    expect(groups[1]).toEqual([lines[2]])
   })
 
   it('빈 line 배열 → 빈 group 1개', () => {
@@ -135,6 +167,23 @@ describe('buildLineStream', () => {
     expect(lines[0]!.kind).toBe('paragraph')
     expect(lines[0]!.height).toBe(20)
     expect(lines[0]!.splittable).toBe(true)
+    document.body.removeChild(parent)
+  })
+
+  it('computed vertical margin 을 각 source line 에 보존한다', () => {
+    const parent = setupParent([
+      '<p style="margin-top: 12px; margin-bottom: 8px;">ABCDEFGHIJ</p>'
+    ])
+    const p = parent.firstElementChild as HTMLElement
+    Object.defineProperty(p, 'offsetHeight', { value: 200, configurable: true })
+    const lines = buildLineStream(
+      [p],
+      { innerWidthPx: 500, innerHeightPx: 100 },
+      fakeMeasurer(2, 20)
+    )
+    expect(lines.length).toBe(5)
+    expect(lines.every((line) => line.marginTop === 12)).toBe(true)
+    expect(lines.every((line) => line.marginBottom === 8)).toBe(true)
     document.body.removeChild(parent)
   })
 
