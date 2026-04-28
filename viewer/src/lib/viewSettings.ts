@@ -31,6 +31,11 @@ export function applyViewSettings(settings: ViewSettings): void {
   if (typeof document === 'undefined') return
   document.documentElement.dataset.theme = settings.theme
   document.body.dataset.layout = settings.layout
+  if (settings.showContentBounds) {
+    document.body.dataset.contentBounds = 'on'
+  } else {
+    delete document.body.dataset.contentBounds
+  }
   const root = document.documentElement.style
   root.setProperty('--user-font-stack', FONT_STACKS[settings.font] ?? 'inherit')
   root.setProperty('--user-font-scale', String(settings.fontScale))

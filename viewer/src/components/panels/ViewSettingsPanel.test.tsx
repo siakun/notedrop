@@ -20,7 +20,8 @@ const mocks = vi.hoisted(() => ({
     font: 'system',
     fontScale: 1,
     lineScale: 1,
-    align: 'left'
+    align: 'left',
+    showContentBounds: false
   } as ViewSettings,
   patch: vi.fn()
 }))
@@ -42,7 +43,8 @@ beforeEach(() => {
     font: 'system',
     fontScale: 1,
     lineScale: 1,
-    align: 'left'
+    align: 'left',
+    showContentBounds: false
   })
   mocks.patch.mockReset()
 })

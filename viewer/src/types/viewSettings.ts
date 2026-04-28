@@ -24,6 +24,7 @@ export type ViewSettings = {
   fontScale: number
   lineScale: number
   align: AlignMode
+  showContentBounds: boolean
 }
 
 export const VS_DEFAULTS: ViewSettings = {
@@ -37,7 +38,8 @@ export const VS_DEFAULTS: ViewSettings = {
   font: 'system',
   fontScale: 1,
   lineScale: 1,
-  align: 'left'
+  align: 'left',
+  showContentBounds: false
 }
 
 /**

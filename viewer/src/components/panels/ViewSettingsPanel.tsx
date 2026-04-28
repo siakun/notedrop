@@ -185,6 +185,31 @@ export default function ViewSettingsPanel() {
 
         {isBookOnly && (
           <section className="vs-section vs-book-only">
+            <div className="vs-toggle-row">
+              <span className="vs-label vs-label-inline">콘텐츠 영역 표시</span>
+              <button
+                type="button"
+                className="vs-toggle"
+                role="switch"
+                aria-checked={Boolean(settings.showContentBounds)}
+                aria-label="콘텐츠 영역 모서리 표시"
+                onClick={() =>
+                  patch({ showContentBounds: !settings.showContentBounds })
+                }
+              >
+                <span className="vs-toggle-track" aria-hidden="true">
+                  <span className="vs-toggle-thumb" />
+                </span>
+                <span className="vs-toggle-state">
+                  {settings.showContentBounds ? 'On' : 'Off'}
+                </span>
+              </button>
+            </div>
+          </section>
+        )}
+
+        {isBookOnly && (
+          <section className="vs-section vs-book-only">
             <p className="vs-label">여백 (mm)</p>
             <div className="vs-margins">
               {MARGIN_FIELDS.map((f) => {

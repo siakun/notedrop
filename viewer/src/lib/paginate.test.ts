@@ -57,7 +57,8 @@ describe('computePageFit', () => {
       font: 'system',
       fontScale: 1,
       lineScale: 1,
-      align: 'left'
+      align: 'left',
+      showContentBounds: false
     }
     const sizes: PageSize[] = ['Auto', 'B4', 'A4', 'B5', 'A5']
 
