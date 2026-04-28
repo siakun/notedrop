@@ -1,0 +1,4 @@
+interface:
+  display_name: "Notedrop Viewer Screenshot Check"
+  short_description: "Capture notedrop viewer screenshots."
+  default_prompt: "Capture and inspect a screenshot of the notedrop viewer UI."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Notedrop Viewer Playwright Check"
+  short_description: "Check notedrop viewer with Playwright."
+  default_prompt: "Run a Playwright check against the notedrop viewer dev server."

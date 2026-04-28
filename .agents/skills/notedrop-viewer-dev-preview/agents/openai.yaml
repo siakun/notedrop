@@ -1,0 +1,4 @@
+interface:
+  display_name: "Notedrop Viewer Dev Preview"
+  short_description: "Preview viewer source in browser."
+  default_prompt: "Preview the notedrop viewer directly from source with a local Next dev server and browser automation."

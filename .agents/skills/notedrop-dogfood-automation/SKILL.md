@@ -7,6 +7,13 @@ description: Use when developing notedrop plugin/viewer and need to verify behav
 
 vault 안 plugin 의 모든 read/write/명령/검증 step 을 obsidian-cli + gh + curl 로 자동화. 사용자 수동 첨부·수동 publish·수동 BRAT 재설치 없이 dogfood 사이클 종결.
 
+## 자매 skill 과의 분기
+
+- **viewer UI 코드만 변경 + 빠른 시각 검증**: `notedrop-viewer-dev-preview` 우선. 로컬 Next dev 가 *현재 워크스페이스 source 그대로* 띄움 → publish/release/BRAT/GH Pages 사이클 0. 사용자 수동 조작도 manual launch mode 로 지원.
+- **plugin 동작·publish 사이클·share repo·GH Pages·BRAT 까지 포함**: 본 skill (dogfood-automation). 실 Obsidian 인스턴스 + 실 share repo + 실 GH Pages 가 필요한 모든 시나리오.
+
+둘 다 필요한 경우 (예: viewer 변경 + plugin 인라인 효과 검증) → 먼저 viewer-dev-preview 로 UI 자체를 확정, 그 후 dogfood 로 publish 흐름 검증.
+
 ## 전제
 
 - `obsidian` CLI 가 PATH 등록 + Obsidian 1.4+ 가 실행 중
@@ -132,7 +139,7 @@ LAST_MOD=$(curl -sI "https://siakun.github.io/notedrop-share/manifest.json" | gr
 
 obsidian-cli 범위 밖. 의무 의무:
 - HTML/JSON status: `WebFetch` 또는 `curl -sI`
-- 시각 검증·console error: `playwright-skill` 또는 `browser-use` skill 호출
+- 시각 검증·console error: 우선 `notedrop-viewer-dev-preview` (publish 사이클 0 인 로컬 dev). publish 후 *실 production* 검증이 필요하면 `playwright-skill` / `browser-use` 로 GH Pages URL 직접 점검.
 - 예: `curl -sI <viewer>/_next/static/<expectedBuildId>/_buildManifest.js` 가 404 → buildId mismatch 검출
 
 ## 우선순위 (작업 자주 빈도순)
@@ -165,7 +172,7 @@ obsidian-cli 범위 밖. 의무 의무:
 
 | 한계 | 우회책 |
 |---|---|
-| 브라우저 viewer 시각 검증 | `playwright-skill` 또는 `browser-use` 호출 |
+| 브라우저 viewer 시각 검증 | viewer source 만 검증이면 `notedrop-viewer-dev-preview`. production GH Pages 검증이면 `playwright-skill` / `browser-use` |
 | Obsidian window screenshot path | obsidian-cli 의 path 처리 quirk — `dev:cdp method=Page.captureScreenshot` 으로 base64 받기 시도 가능 (미완 검증) |
 | mock vault 생성 (§6.3) | 사용자 수동 vault 생성 + Obsidian 으로 1회 open. 이후 자동 |
 | GH Pages enable (§7.1) | `administration:write` scope 부여한 PAT 를 환경변수로 받음 |

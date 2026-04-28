@@ -1,0 +1,4 @@
+interface:
+  display_name: "Notedrop Viewer Dev Server"
+  short_description: "Start notedrop viewer locally."
+  default_prompt: "Start the notedrop viewer dev server from current source."

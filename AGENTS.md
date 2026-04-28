@@ -2,6 +2,17 @@
 
 세션 / compact 후에도 절대 잊지 말 것.
 
+## Viewer local browser 검증
+
+notedrop viewer UI 를 Obsidian publish / release / BRAT / GH Pages 없이 바로 확인해야 하면 `.agents/skills` 의 standalone skill 을 사용한다.
+
+- `notedrop-viewer-dev-preview`: 통합 흐름. `viewer/` 를 Next dev server 로 띄우고 현재 workspace source 를 localhost 에서 확인.
+- `notedrop-viewer-dev-server`: dev server 만 준비하거나 수동 브라우저 확인이 필요할 때.
+- `notedrop-viewer-playwright-check`: Playwright 로 DOM, hover, computed style, console error, 접근성 이름을 검증할 때.
+- `notedrop-viewer-screenshot-check`: screenshot 기반으로 spacing, clipping, overlap, responsive, dark theme 을 확인할 때.
+
+이 흐름은 local source 검증만 의미한다. Obsidian vault state, plugin command, publish output, cache key, release asset, GH Pages, BRAT 검증은 `notedrop-dogfood-automation` 을 사용한다.
+
 ## Release / tag 하네스 — 절대 규칙
 
 **`.github/workflows/release.yml` 가 tag 와 GitHub Release 를 자체 생성한다.** 로컬에서 tag 를 만들거나 push 하지 말 것.

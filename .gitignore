@@ -1,5 +1,8 @@
-# claude
+# agent tools (claude code, codex)
+# canonical: .agents/skills/ + AGENTS.md
+# .claude/skills/ and CLAUDE.md are generated as junction/hard link by scripts/link-agent-files.ps1
 .claude/
+CLAUDE.md
 
 # build artifacts
 main.js
