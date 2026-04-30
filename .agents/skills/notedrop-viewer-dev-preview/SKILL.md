@@ -57,7 +57,7 @@ When the user asks to "launch it", "open the viewer", or wants to drive the UI t
    until curl -s -o /dev/null -w "%{http_code}" http://localhost:3100 | grep -q "200"; do sleep 1; done
    ```
 
-4. Open the browser to a real entry, not just `/`. The default fixture is `welcome`:
+4. Open the browser to a real entry, not just `/`. The default sample is `welcome`:
 
    ```bash
    start http://localhost:3100/#/welcome/

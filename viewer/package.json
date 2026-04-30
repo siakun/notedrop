@@ -3,6 +3,9 @@
   "version": "0.2.5",
   "private": true,
   "scripts": {
+    "gen:sample": "node ../plugin/tools/run-sample.mjs",
+    "predev": "node ../plugin/tools/run-sample.mjs",
+    "prebuild": "node ../plugin/tools/run-sample.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

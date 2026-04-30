@@ -9,7 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "gen:sample": "node tools/run-sample.mjs"
   },
   "dependencies": {
     "@types/diff": "^7.0.2",
