@@ -9,6 +9,12 @@ description: Use when developing notedrop viewer UI and needing a fast browser c
 
 Use the viewer as a standalone Next app. Start `viewer/` with `npm run dev`, open `localhost` with Playwright or the in-app browser, exercise the UI, then stop the dev server. This checks current workspace source directly, so no Obsidian publish, release asset, version bump, or plugin reload is needed.
 
+`npm run dev` now starts two services via `concurrently`:
+- **Next dev** on `localhost:3100` (viewer source + HMR)
+- **Preview sidecar** on `localhost:4321` — the same `PreviewServer` class the plugin uses, watching `viewer/samples/` and emitting SSE on `/events` for live reload
+
+Next dev's `beforeFiles` rewrites proxy `/manifest.json`, `/content/**`, `/events` to the sidecar so the browser sees a single origin. Editing files under `viewer/samples/**` triggers automatic invalidation in the viewer — no `npm run gen:sample` rerun needed.
+
 ## Use This For
 
 - Viewer-only UI changes under `viewer/src`.
@@ -43,18 +49,21 @@ Do NOT try to keep the helper script's dev server alive — its `finally` block 
 When the user asks to "launch it", "open the viewer", or wants to drive the UI themselves, do not use the helper script. Use this flow:
 
 1. Pre-flight checks the same as automated mode (test/typecheck/build if relevant to the change).
-2. Start the dev server as a background task so it persists across tool calls:
+2. Start the dev server as a background task so it persists across tool calls. **No `-p` flag** — `concurrently` swallows args and the port is hardcoded in the `dev:next` script.
 
    ```bash
    # in bash, working dir = viewer/
-   npm run dev -- -p 3100
+   npm run dev
    # tool call: run_in_background: true
    ```
 
-3. Poll readiness without sleeping:
+3. Poll readiness — both Next (3100) AND sidecar (4321). Checking only 3100 isn't enough; the rewrites silently 502 if the sidecar isn't up yet.
 
    ```bash
-   until curl -s -o /dev/null -w "%{http_code}" http://localhost:3100 | grep -q "200"; do sleep 1; done
+   until curl -s -o /dev/null -w "%{http_code}" http://localhost:3100 | grep -q "200" \
+      && curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4321/manifest.json | grep -q "200"; do
+     sleep 1
+   done
    ```
 
 4. Open the browser to a real entry, not just `/`. The default sample is `welcome`:
@@ -113,7 +122,10 @@ The Playwright script run by the wrapper has `chromium`, `firefox`, `webkit`, an
 
 ## Common Mistakes
 
-- Do not claim release, BRAT, or GH Pages behavior from this workflow; it only proves current source served by Next dev.
+- Do not claim release, BRAT, or GH Pages behavior from this workflow; it only proves current source served by Next dev + sidecar.
+- Do not pass `-- -p <port>` to `npm run dev`. `concurrently` swallows extra args; the `-p` flag never reaches `next dev`. The Next port is hardcoded in `dev:next`. Override the sidecar port via `NOTEDROP_SIDECAR_PORT` (read by both the sidecar and Next's rewrites).
+- Do not run `npm run gen:sample` before `npm run dev`. The sidecar serves `viewer/samples/` dynamically; pre-generation is `prebuild` only (production export).
+- Do not poll only `localhost:3100` — verify the sidecar at `127.0.0.1:4321/manifest.json` too. Next without sidecar returns 502 on `/manifest.json` even though `/` itself returns 200.
 - Do not leave `Start-Job` or `npm run dev` processes running after *automated* verification. Manual launch is the explicit exception (§Manual Launch).
 - Do not use fixed sleeps for server readiness; poll `http://localhost:<port>`.
 - Do not rely on immediate computed styles after hover when CSS transitions exist; wait roughly 150ms before reading.
