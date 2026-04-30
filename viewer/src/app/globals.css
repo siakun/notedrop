@@ -785,6 +785,44 @@ body[data-content-bounds='on'] .paper-page::before {
 .toc a:hover { color: var(--color-text); }
 .toc a.active { color: var(--color-accent-hover); font-weight: 600; }
 
+/* Toc tree (section group) */
+.toc .toc-group { margin: 0.6rem 0; }
+.toc .toc-group > details { margin: 0; }
+.toc .toc-group > details > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+.toc .toc-group > details > summary::-webkit-details-marker { display: none; }
+.toc .toc-group > details > summary::before {
+  content: '\203A';
+  display: inline-block;
+  width: 0.8rem;
+  text-align: center;
+  color: var(--color-faint);
+  transition: transform 0.12s ease;
+  transform: rotate(0deg);
+}
+.toc .toc-group > details[open] > summary::before {
+  transform: rotate(90deg);
+}
+.toc .toc-group > details > ol {
+  margin: 0.25rem 0 0.4rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid var(--color-border);
+}
+.toc .toc-group > details > ol > li { margin: 0.25rem 0; }
+.toc .toc-group > details > ol > li > a {
+  font-size: 0.84rem;
+  padding-left: 0.1rem;
+}
+
 /* Entry list */
 .entry-list {
   list-style: none;

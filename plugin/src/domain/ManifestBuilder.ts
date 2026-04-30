@@ -30,6 +30,7 @@ function serialize(item: PublishedItem): ManifestItem {
     type: item.type,
     parent: item.parent,
     order: item.order,
+    section: item.section,
     chapters: item.chapters,
     updatedAt: item.updatedAt
   }

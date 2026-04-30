@@ -67,7 +67,7 @@ describe('ManifestBuilder.build()', () => {
     }
   })
 
-  it('emits ManifestItem with exactly the 10 spec keys', () => {
+  it('emits ManifestItem with exactly the 11 spec keys', () => {
     const builder = new ManifestBuilder(index)
     const m = builder.build({ generatedBy: 'x' })
     expect(Object.keys(m.items[0]!).sort()).toEqual([
@@ -77,6 +77,7 @@ describe('ManifestBuilder.build()', () => {
       'order',
       'parent',
       'render',
+      'section',
       'slug',
       'title',
       'type',
@@ -111,6 +112,7 @@ describe('ManifestBuilder.build()', () => {
     const chItem = m.items.find((it) => it.hash === ch.hash)!
     expect(chItem.chapters).toBeNull()
     expect(chItem.parent).toBe(entry.hash)
+    expect(chItem.section).toBeNull()
   })
 
   it('items sorted: entries first then chapters by parent+order', () => {
