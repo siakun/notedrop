@@ -12,6 +12,9 @@ export type PreviewServerOptions = {
   port?: number
   host?: string
   onPreviewError?: (category: string, msg: string, data?: Record<string, unknown>) => void
+  /** Override embedded viewer.zip base64. dev sidecar 가 ''(empty) 를 넘기면
+   * viewer asset 서빙은 자동 skip — Next dev 가 viewer 페이지 자체를 서빙. */
+  viewerZipB64?: string
 }
 
 export type PreviewServerStatus =
@@ -71,7 +74,8 @@ export class PreviewServer {
     const port = this.options.port ?? 4321
     const host = this.options.host ?? '127.0.0.1'
 
-    this.viewerAssets = unpackViewerZip(viewerZipB64, this.options.onPreviewError)
+    const zipSource = this.options.viewerZipB64 ?? viewerZipB64
+    this.viewerAssets = unpackViewerZip(zipSource, this.options.onPreviewError)
 
     const server = http.createServer((req, res) => {
       this.handle(req, res).catch((err) => {
@@ -164,7 +168,7 @@ export class PreviewServer {
     const url = new URL(req.url ?? '/', 'http://localhost')
     const pathname = stripBasePath(decodeURIComponent(url.pathname))
 
-    if (pathname === '/events') return this.handleEvents(req, res)
+    if (pathname === '/events' || pathname === '/events/') return this.handleEvents(req, res)
 
     if (pathname === '/manifest.json') {
       const plan = await this.orchestrator.plan()

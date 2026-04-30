@@ -53,6 +53,14 @@ export class PublishIndex {
     for (const handler of set) handler(hash)
   }
 
+  /** External rebuild paths (e.g. dev sidecar) call build({bookAssembler}) for
+   * authoritative state, then diff snapshots and dispatch synthetic events.
+   * In-process upsert/remove/rename already emit internally — only use this
+   * when bypassing those for full rebuild semantics. */
+  dispatch(event: IndexEvent, hash: string): void {
+    this.emit(event, hash)
+  }
+
   async build(deps: { bookAssembler?: BookAssemblerLike } = {}): Promise<void> {
     this.byHash.clear()
     this.pathToHash.clear()
@@ -86,7 +94,8 @@ export class PublishIndex {
           ...child,
           type: 'chapter',
           parent: entry.hash,
-          order: ch.order
+          order: ch.order,
+          section: deriveSection(entry.filePath, ch.filePath)
         }
         this.byHash.set(child.hash, updated)
         linked.push(child.hash)
@@ -195,6 +204,7 @@ export class PublishIndex {
       type: 'entry',
       parent: null,
       order: null,
+      section: null,
       chapters: null,
       cover: typeof fm['notedrop-cover'] === 'string'
         ? (fm['notedrop-cover'] as string)
@@ -273,6 +283,22 @@ export class PublishIndex {
 function deriveTitle(filePath: string): string {
   const base = filePath.split('/').pop() ?? filePath
   return base.replace(/\.md$/, '')
+}
+
+/** chapter 의 직속 부모 폴더명을 entry 폴더 기준 상대 경로 첫 segment 로 반환.
+ * entry filePath = '/A/B/A.md', chapter = '/A/B/Part 1/01.md' → 'Part 1'.
+ * chapter 가 entry 와 같은 폴더면 null. */
+function deriveSection(entryFilePath: string, chapterFilePath: string): string | null {
+  const entrySegs = entryFilePath.split('/').filter(Boolean)
+  const chapterSegs = chapterFilePath.split('/').filter(Boolean)
+  // entry 의 마지막 segment (== entry .md) 제거 후 그 path 가 chapter path 의 prefix 인지
+  const entryFolderSegs = entrySegs.slice(0, -1)
+  for (let i = 0; i < entryFolderSegs.length; i++) {
+    if (chapterSegs[i] !== entryFolderSegs[i]) return null
+  }
+  // chapter path 안 entry 폴더 다음 segment 가 sub-folder 면 그게 section. 직속이면 null.
+  if (chapterSegs.length <= entryFolderSegs.length + 1) return null
+  return chapterSegs[entryFolderSegs.length]!
 }
 
 function inferRender(filePath: string): RenderMode {

@@ -1,6 +1,5 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import { parse as parseYaml } from 'yaml'
 
 import { PublishIndex } from '../src/domain/PublishIndex.js'
 import { ContentResolver } from '../src/domain/ContentResolver.js'
@@ -8,131 +7,7 @@ import { ContentTransformer } from '../src/domain/ContentTransformer.js'
 import { ManifestBuilder } from '../src/domain/ManifestBuilder.js'
 import { BookAssembler } from '../src/domain/BookAssembler.js'
 import { PublishOrchestrator } from '../src/domain/PublishOrchestrator.js'
-import type { VaultFs } from '../src/ports/VaultFs.js'
-import type {
-  MetaCache,
-  CacheHeading,
-  CacheLink,
-  CacheEvent,
-  CacheEventHandler
-} from '../src/ports/MetaCache.js'
-import type { ManifestItem } from '../src/types.js'
-
-const FM_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/
-
-class NodeVaultFs implements VaultFs {
-  constructor(private root: string) {}
-
-  private full(rel: string): string {
-    return path.join(this.root, rel.startsWith('/') ? rel.slice(1) : rel)
-  }
-  private rel(abs: string): string {
-    const r = path.relative(this.root, abs).replace(/\\/g, '/')
-    return '/' + r
-  }
-
-  async readFile(p: string): Promise<string> {
-    return fs.readFile(this.full(p), 'utf8')
-  }
-  async readBinary(p: string): Promise<Uint8Array> {
-    const buf = await fs.readFile(this.full(p))
-    return new Uint8Array(buf)
-  }
-  async writeFile(p: string, content: string): Promise<void> {
-    const fp = this.full(p)
-    await fs.mkdir(path.dirname(fp), { recursive: true })
-    await fs.writeFile(fp, content, 'utf8')
-  }
-  async fileExists(p: string): Promise<boolean> {
-    try {
-      await fs.access(this.full(p))
-      return true
-    } catch {
-      return false
-    }
-  }
-  async listFiles(folder: string): Promise<string[]> {
-    const folderAbs = this.full(folder)
-    let entries: import('node:fs').Dirent[]
-    try {
-      entries = await fs.readdir(folderAbs, { withFileTypes: true })
-    } catch {
-      return []
-    }
-    const out: string[] = []
-    for (const ent of entries) {
-      if (!ent.isFile()) continue
-      out.push(this.rel(path.join(folderAbs, ent.name)))
-    }
-    return out
-  }
-  async listAllFiles(): Promise<string[]> {
-    const out: string[] = []
-    const walk = async (dir: string): Promise<void> => {
-      const entries = await fs.readdir(dir, { withFileTypes: true })
-      for (const ent of entries) {
-        const abs = path.join(dir, ent.name)
-        if (ent.isDirectory()) await walk(abs)
-        else if (ent.isFile()) out.push(this.rel(abs))
-      }
-    }
-    await walk(this.root)
-    return out
-  }
-  async searchByName(filename: string): Promise<string[]> {
-    const all = await this.listAllFiles()
-    return all.filter((p) => path.basename(p) === filename)
-  }
-}
-
-class NodeMetaCache implements MetaCache {
-  private fm = new Map<string, Record<string, unknown>>()
-
-  constructor(private vault: NodeVaultFs) {}
-
-  async preload(): Promise<void> {
-    const all = await this.vault.listAllFiles()
-    for (const p of all) {
-      if (!p.endsWith('.md')) continue
-      try {
-        const raw = await this.vault.readFile(p)
-        const parsed = parseFrontmatter(raw)
-        if (parsed) this.fm.set(p, parsed)
-      } catch {
-        // skip unreadable
-      }
-    }
-  }
-
-  override(p: string, fm: Record<string, unknown>): void {
-    const existing = this.fm.get(p) ?? {}
-    this.fm.set(p, { ...existing, ...fm })
-  }
-
-  getFrontmatter(p: string): Record<string, unknown> | null {
-    return this.fm.get(p) ?? null
-  }
-  getHeadings(_p: string): CacheHeading[] {
-    return []
-  }
-  getLinks(_p: string): CacheLink[] {
-    return []
-  }
-  on(_e: CacheEvent, _h: CacheEventHandler): () => void {
-    return () => {}
-  }
-}
-
-function parseFrontmatter(raw: string): Record<string, unknown> | null {
-  const m = FM_RE.exec(raw)
-  if (!m) return null
-  try {
-    const obj = parseYaml(m[1]!) as Record<string, unknown> | null
-    return obj ?? {}
-  } catch {
-    return {}
-  }
-}
+import { NodeVaultFs, NodeMetaCache } from './node-runtime.js'
 
 const ARG_VAULT = process.argv[2]
 const ARG_PUBLIC = process.argv[3]

@@ -27,6 +27,7 @@ plugin/src/embedded/
 
 # sample builder bundle (esbuild 산출, 매 실행마다 새로 빌드)
 plugin/tools/generate-sample.mjs
+plugin/tools/preview-sidecar.mjs
 
 # editor
 .DS_Store

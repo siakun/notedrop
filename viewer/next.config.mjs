@@ -32,8 +32,33 @@ const buildShaShort = buildSha.slice(0, 7) || 'unknown'
 // 이라 실수로 다른 path 와 충돌할 일 없음.
 const PLACEHOLDER_BASE = '/__NOTEDROP_BASE__'
 
+// Dev 한정 rewrites: viewer/samples/ 변경을 즉시 반영하기 위해 /manifest.json,
+// /content/**, /events 를 사이드카 (port 4321 default) 로 proxy.
+// 사이드카 = 플러그인의 PreviewServer 클래스를 그대로 재사용 — same SSE 흐름.
+// prod build 에는 rewrites 함수 자체를 attach 하지 않아 'output: export' 와
+// 공존 시 Next 14 warning 도 피함. NOTEDROP_SIDECAR_PORT 로 포트 override 가능.
+const devRewrites = async () => {
+  const sidecarPort = process.env.NOTEDROP_SIDECAR_PORT || '4321'
+  const base = `http://127.0.0.1:${sidecarPort}`
+  // beforeFiles: Next 가 public/manifest.json (예전 npm run gen:sample 산출
+  // 정적 파일) 을 서빙하기 *전에* 사이드카로 보냄. afterFiles 로 두면
+  // public/ 가 이김 → 사이드카 변경이 안 보이는 silent failure.
+  return {
+    beforeFiles: [
+      { source: '/manifest.json', destination: `${base}/manifest.json` },
+      { source: '/content/:hash/index.md', destination: `${base}/content/:hash/index.md` },
+      { source: '/content/:hash/_assets/:asset*', destination: `${base}/content/:hash/_assets/:asset*` },
+      // trailingSlash:true 가 /events → /events/ 308 redirect 시키므로
+      // 양쪽 다 매칭. 사이드카 핸들러도 둘 다 받음.
+      { source: '/events', destination: `${base}/events` },
+      { source: '/events/', destination: `${base}/events` }
+    ]
+  }
+}
+
 const config = {
-  output: 'export',
+  // dev 에서는 export 모드 + rewrites 사용; prod 는 정적 export 만.
+  ...(isProd ? { output: 'export' } : { rewrites: devRewrites }),
   basePath: isProd ? PLACEHOLDER_BASE : '',
   trailingSlash: true,
   images: { unoptimized: true },

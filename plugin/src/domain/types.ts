@@ -11,6 +11,7 @@ export type PublishedItem = {
   type: ItemType
   parent: string | null
   order: number | null
+  section: string | null
   chapters: string[] | null
   cover: string | null
   customCssRaw: { inline: string | null, file: string | null }

@@ -21,6 +21,7 @@
   "devDependencies": {
     "@types/node": "20.14.10",
     "@vitest/coverage-v8": "1.6.0",
+    "chokidar": "^3.6.0",
     "esbuild": "^0.28.0",
     "obsidian": "^1.12.3",
     "typescript": "5.4.5",
