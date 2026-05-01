@@ -2,6 +2,56 @@
 
 세션 / compact 후에도 절대 잊지 말 것.
 
+## Cross-Agent Project Memory Bridge
+
+이 파일은 Codex 와 Claude Code 가 함께 읽는 공유 지침이다.
+
+### Shared instruction file rule
+
+`AGENTS.md` 가 이 repo 의 canonical shared instruction file 이다.
+
+`CLAUDE.md` 는 Claude Code 호환을 위한 generated hard-link alias 로 취급하며, `scripts/link-agent-files.ps1` 로 언제든 재생성될 수 있다.
+
+공유 project instruction 을 수정해야 하면 `CLAUDE.md` 가 아니라 `AGENTS.md` 를 수정한다. 수정 후 `scripts/link-agent-files.ps1` 를 실행해 `CLAUDE.md` hard link 를 재생성/검증한다.
+
+### Shared skill directory rule
+
+`.agents/skills` 가 이 repo 의 canonical shared skill directory 이다.
+
+`.claude/skills` 는 Claude Code 호환을 위한 generated junction 으로 취급하며, `.agents/skills` 를 가리켜야 한다.
+
+공유 skill 을 생성/수정/이름변경/삭제해야 하면 `.claude/skills` 가 아니라 `.agents/skills` 에서 작업한다. 수정 후 `scripts/link-agent-files.ps1` 를 실행해 `.claude/skills` junction 을 재생성/검증한다.
+
+### Canonical project memory
+
+Claude Code project memory 를 이 repo 의 project-scoped memory 원본으로 본다.
+
+`C:\Users\User\.claude\projects\C--Users-User-Documents-github-siakun-notedrop\memory`
+
+### If you are Codex
+
+이 repo 에서 non-trivial 작업을 시작하기 전에 위 canonical project memory 디렉터리의 Markdown 파일을 읽는다. 특히 아래 파일들은 notedrop 작업에서 project memory 로 취급한다.
+
+- `MEMORY.md`
+- `feedback_action_monitoring_의무.md`
+- `feedback_LLM_context_rot_어휘_금지.md`
+- `feedback_release_자율진행.md`
+- `feedback_설계원칙_구조적해결.md`
+- `feedback_커밋_메시지_특수문자.md`
+- `project_notedrop_별도디렉토리.md`
+- `project_notedrop_세션간_핸드오프.md`
+- `project_notedrop_코드맵.md`
+- `reference_커밋수정_스킬.md`
+- `user_github_username.md`
+
+Codex native memory 와 위 Claude memory 가 충돌하면 이 `AGENTS.md` 의 명시 규칙을 최우선으로 둔다.
+
+### If you are Claude Code
+
+Claude Code 는 native project memory 를 이미 읽을 수 있으므로, 위 Codex 용 "메모리를 읽으라"는 지시를 중복 수행하지 않는다.
+
+대신 canonical project memory 디렉터리의 실제 Markdown 파일 목록과 이 섹션의 목록이 불일치하면, 메모리 파일을 이 목록에 맞춰 삭제/생성하지 말고 이 `AGENTS.md` 목록을 실제 디렉터리 상태에 맞게 갱신한다.
+
 ## Viewer local browser 검증
 
 notedrop viewer UI 를 Obsidian publish / release / BRAT / GH Pages 없이 바로 확인해야 하면 `.agents/skills` 의 standalone skill 을 사용한다.
@@ -17,10 +67,13 @@ notedrop viewer UI 를 Obsidian publish / release / BRAT / GH Pages 없이 바�
 
 viewer UI · pagination · margin · layout · 스타일 · DOM · hover 등 동작을 *확인* 하기 위한 목적으로는 절대 version bump + release 하지 말 것. iteration 흐름:
 
-1. `notedrop-viewer-dev-preview` (또는 `notedrop-viewer-dev-server`) 로 localhost dev server 띄움
-2. 코드 수정 → HMR 자동 반영 → 브라우저에서 확인
-3. 문제 발견 시 dev server 살아있는 상태로 다시 수정 → 즉시 재확인
-4. 만족할 때까지 반복
+1. `notedrop-viewer-dev-preview` (또는 `notedrop-viewer-dev-server`) 로 localhost dev 띄움
+2. 코드 수정 (`viewer/src/**`) → Next HMR 자동 반영 → 브라우저에서 확인
+3. 콘텐츠 수정 (`viewer/samples/**`) → 사이드카가 PreviewServer + chokidar 로 watch → SSE `event: changed` 자동 발화 → viewer cache invalidate 후 재페치
+4. 문제 발견 시 dev 살아있는 상태로 다시 수정 → 즉시 재확인
+5. 만족할 때까지 반복
+
+`npm run dev` 가 `concurrently sidecar + next` 동시 기동 (Next 3100, 사이드카 4321). 사이드카는 플러그인의 `PreviewServer` 클래스를 그대로 재사용 → dev 에서 본 transport 동작이 플러그인 preview 와 동일. `npm run gen:sample` 은 prod build (`prebuild` hook) 전용 — dev 에서 미리 돌릴 필요 없음. `-- -p <port>` 같은 인자는 `concurrently` 가 삼키므로 동작 안 함; Next 포트는 `dev:next` 안에 박혀 있고 사이드카 포트는 `NOTEDROP_SIDECAR_PORT` env 로 override (양쪽 동시 적용).
 
 5 곳 version bump + `🔖 release(vX.Y.Z): ...` commit + `git push origin main` 은 *fix 가 확정되어 사용자에게 배포 준비가 됐을 때만*. release 를 "동작 확인용 build artifact 생성기" 로 쓰지 말 것.
 

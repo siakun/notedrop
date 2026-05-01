@@ -9,9 +9,13 @@
 # Migration rules (when run on a machine with the "wrong" side present):
 #   * Only .claude/skills exists (real)        -> moved to .agents/skills
 #   * Only CLAUDE.md exists (real)             -> renamed to AGENTS.md
-#   * Both real entries exist (rare conflict)  -> the one with newer LastWriteTime
-#                                                 wins; the loser is moved to
-#                                                 "<name>.bak.YYYYMMDDHHMMSS"
+#   * Both AGENTS.md and CLAUDE.md exist real  -> AGENTS.md wins by default.
+#                                                 CLAUDE.md is backed up and
+#                                                 recreated as a hard link.
+#                                                 Pass -AdoptClaude only when
+#                                                 you intentionally want the
+#                                                 CLAUDE.md copy to replace
+#                                                 AGENTS.md.
 # After migration the script (re)creates the junction and hard link.
 #
 # Idempotent: safe to run repeatedly. Windows-only (uses NTFS junction + hard link).
@@ -20,9 +24,12 @@
 # Usage:
 #   pwsh scripts/link-agent-files.ps1
 #   .\scripts\link-agent-files.ps1     (Windows PowerShell 5.1)
+#   .\scripts\link-agent-files.ps1 -AdoptClaude
 
 [CmdletBinding()]
-param()
+param(
+    [switch]$AdoptClaude
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -153,17 +160,21 @@ if ($canMdKind -eq "missing" -and $linkMdKind -eq "real") {
     $canMdKind = "real"; $linkMdKind = "missing"
 }
 
-# (b) Both real -> newer wins
+# (b) Both real -> AGENTS.md wins by default. CLAUDE.md can be promoted
+# intentionally with -AdoptClaude.
 if ($canMdKind -eq "real" -and $linkMdKind -eq "real") {
     $cM = (Get-Item -LiteralPath $canonicalMd -Force).LastWriteTimeUtc
     $lM = (Get-Item -LiteralPath $linkMd       -Force).LastWriteTimeUtc
-    if ($lM -gt $cM) {
+    if ($AdoptClaude) {
         $bak = Move-OverWithBackup -From $linkMd -To $canonicalMd
-        Write-Host "[md] CLAUDE.md newer - replaced AGENTS.md (old kept at $($bak | Split-Path -Leaf))"
+        Write-Host "[md] -AdoptClaude set - replaced AGENTS.md with CLAUDE.md (old kept at $($bak | Split-Path -Leaf))"
     } else {
+        if ($lM -gt $cM) {
+            Write-Warning "[md] CLAUDE.md is newer/diverged, but AGENTS.md is canonical. Keeping AGENTS.md. Use -AdoptClaude to promote the Claude copy."
+        }
         $bak = "$linkMd.bak.$(Get-BackupStamp)"
         Move-Item -LiteralPath $linkMd -Destination $bak
-        Write-Host "[md] AGENTS.md newer - kept; CLAUDE.md -> $($bak | Split-Path -Leaf)"
+        Write-Host "[md] AGENTS.md canonical - kept; CLAUDE.md -> $($bak | Split-Path -Leaf)"
     }
     $linkMdKind = "missing"
 }
