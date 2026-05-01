@@ -22,6 +22,14 @@
 
 공유 skill 을 생성/수정/이름변경/삭제해야 하면 `.claude/skills` 가 아니라 `.agents/skills` 에서 작업한다. 수정 후 `scripts/link-agent-files.ps1` 를 실행해 `.claude/skills` junction 을 재생성/검증한다.
 
+### Commit message rewrite rule
+
+최근 커밋 메시지 점검 또는 message-only rewrite 가 필요하면 `.agents/skills/notedrop-commit-edit` skill 을 사용한다.
+
+- local-only 커밋 메시지 점검은 `Test-CommitMessageConvention.ps1` 로 먼저 확인한다.
+- local-only 메시지 rewrite 는 `Invoke-LocalCommitMessageRewrite.ps1` 의 bundle 백업 + 격리 clone + target 밖 replacement 차단 + `range-diff` 검토 출력 + tree 동일성 + commit count 검증 흐름을 사용한다.
+- pushed commit, release/tag 관련 커밋, force-push 필요 상황은 자동 적용하지 말고 사용자 승인 후 진행한다.
+
 ### Canonical project memory
 
 Claude Code project memory 를 이 repo 의 project-scoped memory 원본으로 본다.

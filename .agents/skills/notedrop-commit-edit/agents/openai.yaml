@@ -1,0 +1,4 @@
+interface:
+  display_name: "Notedrop Commit Edit"
+  short_description: "Check and rewrite local notedrop commit messages safely."
+  default_prompt: "Check recent notedrop commits against the repo commit-message convention and rewrite local-only messages safely when needed."
