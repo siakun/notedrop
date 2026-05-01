@@ -10,9 +10,9 @@
 
 `AGENTS.md` 가 이 repo 의 canonical shared instruction file 이다.
 
-`CLAUDE.md` 는 Claude Code 호환을 위한 generated hard-link alias 로 취급하며, `scripts/link-agent-files.ps1` 로 언제든 재생성될 수 있다.
+`CLAUDE.md` 는 Claude Code 호환을 위한 tracked shim 으로 취급하며, Claude Code 에게 이 `AGENTS.md` 를 읽으라고 안내한다.
 
-공유 project instruction 을 수정해야 하면 `CLAUDE.md` 가 아니라 `AGENTS.md` 를 수정한다. 수정 후 `scripts/link-agent-files.ps1` 를 실행해 `CLAUDE.md` hard link 를 재생성/검증한다.
+공유 project instruction 을 수정해야 하면 `CLAUDE.md` 가 아니라 `AGENTS.md` 를 수정한다. 수정 후 `scripts/link-agent-files.ps1` 를 실행해 `CLAUDE.md` shim 과 `.claude/skills` junction 을 검증한다.
 
 ### Shared skill directory rule
 

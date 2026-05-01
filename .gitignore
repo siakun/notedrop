@@ -1,9 +1,9 @@
 # agent tools (claude code, codex)
 # canonical: .agents/skills/ + AGENTS.md
-# .claude/skills/ and CLAUDE.md are generated as junction/hard link by scripts/link-agent-files.ps1
+# .claude/skills/ is generated as a junction by scripts/link-agent-files.ps1
+# CLAUDE.md is a tracked compatibility shim that points Claude Code to AGENTS.md
 .claude/
-CLAUDE.md
-# scripts/link-agent-files.ps1 가 hardlink 충돌 시 만드는 안전 backup — 추적 X
+# scripts/link-agent-files.ps1 가 CLAUDE.md shim 충돌 시 만드는 안전 backup — 추적 X
 CLAUDE.md.bak.*
 
 # build artifacts
